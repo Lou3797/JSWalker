@@ -361,9 +361,9 @@ function update() { //Handles both update and draw functions- this is probably a
     if(lyle.moveable && gameWindow.keys) {
         if (gameWindow.keys[37]) { //L
             var blockedL = false;
+            var projMoveL = (lyle.x - (lyle.width/2)) - (lyle.xSpd * dt); //projected left boundary after movement
             for (var itrL = 0; itrL < collidables.length; itrL++) {
                 var cL = collidables[itrL];
-                var projMoveL = (lyle.x - (lyle.width/2)) - (lyle.xSpd * dt);
                 if (projMoveL < cL.x + (cL.width/2) && projMoveL > cL.x - (cL.width/2) && lyle.y > cL.y - (cL.height/2) && lyle.y - (lyle.height/2) < cL.y) {
                     blockedL = true;
                     lyle.x = cL.x + (cL.width/2) + (lyle.width/2);
@@ -376,9 +376,9 @@ function update() { //Handles both update and draw functions- this is probably a
         }
         if (gameWindow.keys[39]) { //R
             var blockedR = false;
+            var projMoveR = (lyle.x + (lyle.width/2)) + (lyle.xSpd * dt);
             for (var itrR = 0; itrR < collidables.length; itrR++) {
                 var cR = collidables[itrR];
-                var projMoveR = (lyle.x + (lyle.width/2)) + (lyle.xSpd * dt);
                 if (projMoveR > cR.x - (cR.width/2) && projMoveR < cR.x + (cR.width/2) && lyle.y > cR.y - (cR.height/2) && lyle.y - (lyle.height/2) < cR.y) {
                     blockedR = true;
                     lyle.x = cR.x - (cR.width/2) - (lyle.width/2);
@@ -390,9 +390,9 @@ function update() { //Handles both update and draw functions- this is probably a
         }
         if (gameWindow.keys[38]) { //U
             var blockedU = false;
+            var projMoveU = (lyle.y - (lyle.height/2)) - (lyle.ySpd * dt);
             for (var itrU = 0; itrU < collidables.length; itrU++) {
                 var cU = collidables[itrU];
-                var projMoveU = (lyle.y - (lyle.height/2)) - (lyle.ySpd * dt);
                 if (projMoveU > cU.y - (cU.height/2) && projMoveU < cU.y && lyle.x + (lyle.width/2) > cU.x - (cU.width/2) && lyle.x - (lyle.width/2) < cU.x + (cU.width/2)) {
                     blockedU = true;
                     lyle.y = cU.y + (lyle.height/2);
@@ -405,9 +405,9 @@ function update() { //Handles both update and draw functions- this is probably a
         }
         if (gameWindow.keys[40]) { //D
             var blockedD = false;
+            var projMoveD = lyle.y + (lyle.ySpd * dt);
             for (var itrD = 0; itrD < collidables.length; itrD++) {
                 var cD = collidables[itrD];
-                var projMoveD = lyle.y + (lyle.ySpd * dt);
                 if (projMoveD > cD.y - (cD.height/2) && projMoveD < cD.y && lyle.x + (lyle.width/2) > cD.x - (cD.width/2) && lyle.x - (lyle.width/2) < cD.x + (cD.width/2)) {
                     blockedD = true;
                     lyle.y = cD.y - (cD.height/2);
