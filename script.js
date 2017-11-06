@@ -17,6 +17,11 @@ function startGame() {
     kiana.sprites = [images[7]];
     jackie.sprites = [images[8]];
     portrait.portList = [null, images[0], images[1], images[2], images[3], images[4], images[5]];
+
+    apartment.initializeGrid();
+    apartment.addObject(kiana);
+    apartment.addObject(jackie);
+
     gameWindow.start();
 }
 
@@ -24,13 +29,86 @@ var interactables; //Array holding all possible interactable objects
 var collidables; //You can't run through this shit
 var drawOrder; //Oh god
 var lastUpdate = Date.now();
+var apartment = new Map(100);
+
+//Stores a 2D array of cells on the map that contain references to objects that occupy the cell
+function Map(cellSize) {
+    this.cellSize = cellSize;
+    this.width = 800;
+    this.height = 600;
+    this.grid = [];
+    this.initializeGrid = function() {
+        for(var x = 0; x < this.width/cellSize; x++) {
+            this.grid[x] = [];
+            for(var y = 0; y < this.height/cellSize; y++) {
+                this.grid[x][y] = []; //For each x,y grid coordinate there exists a list of references to all objects there
+            }
+        }
+    };
+    //obj has obj.x, obj.y, obj.width, obj.height
+    this.addObject = function(obj) {
+        var leftBound = obj.x - (obj.width/2);
+        var rightBound = obj.x + (obj.width/2);
+        var topBound = obj.y - (obj.height/2);
+        var bottomBound = obj.y;
+        for(var x = Math.floor(leftBound/this.cellSize); x <= Math.floor(rightBound/this.cellSize) ;x++) {
+            for(var y = Math.floor(topBound/this.cellSize); y <= Math.floor(bottomBound/this.cellSize) ;y++) {
+                this.grid[x][y].push(obj);
+            }
+        }
+    };
+    //obj has obj.x, obj.y, obj.width, obj.height
+    this.getIntersectingGrids = function(obj) {
+        var intersections = [];
+        var leftBound = obj.x - (obj.width/2);
+        var rightBound = obj.x + (obj.width/2);
+        var topBound = obj.y - (obj.height/2);
+        var bottomBound = obj.y;
+        for(var x = Math.floor(leftBound/this.cellSize); x <= Math.floor(rightBound/this.cellSize) ;x++) {
+            for(var y = Math.floor(topBound/this.cellSize); y <= Math.floor(bottomBound/this.cellSize) ;y++) {
+                intersections.push(this.grid[x][y]);
+            }
+        }
+        return intersections; //An array containing the arrays of all possible collisions
+    };
+    this.getIntersectingGridsAtFuturePosition = function(obj, projX, projY) {
+        var intersections = [];
+        var leftBound = projX - (obj.width/2);
+        var rightBound = projX + (obj.width/2);
+        var topBound = projY - (obj.height/2);
+        var bottomBound = projY;
+        for(var x = Math.floor(leftBound/this.cellSize); x <= Math.floor(rightBound/this.cellSize) ;x++) {
+            for(var y = Math.floor(topBound/this.cellSize); y <= Math.floor(bottomBound/this.cellSize) ;y++) {
+                intersections.push(this.grid[x][y]);
+            }
+        }
+        return intersections; //An array containing the arrays of all possible collisions
+    };
+    this.debug = function() {
+        var x, y;
+        var gc = gameWindow.context;
+        for(x = 0; x < this.width/this.cellSize; x++) {
+            gc.beginPath();
+            gc.moveTo(x*this.cellSize,0);
+            gc.lineTo(x*this.cellSize,this.height);
+            gc.stroke();
+        }
+        for(y = 0; y < this.height/this.cellSize; y++ ) {
+            gc.beginPath();
+            gc.moveTo(0, y*this.cellSize);
+            gc.lineTo(this.width, y*this.cellSize);
+            gc.stroke();
+        }
+        for(x = 0; x < this.grid.length; x++) {
+            for(y = 0; y < this.grid[x].length; y++) {
+                gc.fillText((this.grid[x][y]).length, (x*this.cellSize)+25, (y*this.cellSize)+25);
+            }
+        }
+    }
+}
 
 //This stores the SRCs for all portraits. IT'S FUCKING STUPID
 var portrait = {
-    //Lyle, normal = [1]
-    //Kiana, normal = [3]
-    //Jackie, normal = [5]
-    //portList : [null, "https://i.imgur.com/1x7VOxs.png", "https://i.imgur.com/ZGThKjp.png", "https://i.imgur.com/j9xsRqU.png", "https://i.imgur.com/5toPRKK.png", "https://i.imgur.com/azuIOiL.png", "https://i.imgur.com/v9ReXAm.png"], //Lyle, Kiana, Jackie
     portList : null,
     img : null,
     pos : 0,
@@ -101,8 +179,8 @@ var kiana = {
     img : null,
     width : 48,
     height: 96,
-    x : 300,
-    y : 400,
+    x : 260,
+    y : 399,
     xo : 24,
     yo : 96,
     update : function () {
@@ -273,6 +351,8 @@ function update() { //Handles both update and draw functions- this is probably a
     var dt = now - lastUpdate;
     lastUpdate = now;
     gameWindow.clear();
+
+    apartment.debug(); //Comment out when not debugging
 
     for(var i = 0; i < drawOrder.length; i++) {
         drawOrder[i].update();
