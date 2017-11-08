@@ -3,7 +3,7 @@ var mapHeight = 600;
 var lastUpdate = Date.now();
 
 var apartment = new Map(100);
-var block1 = new Block(275, 180, 366, 359);
+var block1 = new Block(200, 180, 366, 359);
 var block2 = new Block(399, 60, 120, 400, "#EE22AA");
 
 
@@ -99,15 +99,16 @@ function Map(cellSize) {
                             actualX = obj.x;
                         }
                         if(this.overlaps(obj.x, goalY, obj.w, obj.h, block.x, block.y, block.w, block.h)) {
-
                             actualY = obj.y;
                         }
+
                     }
                 }
             }
         }
         return [actualX, actualY];
     };
+    //Returns true if the two rectangles overlap
     this.overlaps = function(x1, y1, w1, h1, x2, y2, w2, h2) {
         return (x1 < x2 + w2 && x1 + w1 > x2 && y1 < y2 + h2 && y1 + h1 > y2);
     };
@@ -115,12 +116,14 @@ function Map(cellSize) {
     this.update = function(obj, actualX, actualY) {
         var c, r, index;
         if(obj.x !== actualX || obj.y !== actualY) {
+            //Remove object from cell(s). Can be turned into removeObject(obj) with some refactoring.
             for (c = Math.floor(obj.x / this.cellSize); c < (obj.x + obj.w) / this.cellSize; c++) {
                 for (r = Math.floor(obj.y / this.cellSize); r < (obj.y + obj.h) / this.cellSize; r++) {
                     index = this.cells[c][r].indexOf(obj);
                     this.cells[c][r].splice(index, 1);
                 }
             }
+            //Add object to cell(s). Can be replaced with addObject() with some refactoring
             for (c = Math.floor(actualX / this.cellSize); c < (actualX + obj.w) / this.cellSize; c++) {
                 for (r = Math.floor(actualY / this.cellSize); r < (actualY + obj.h) / this.cellSize; r++) {
                     index = this.cells[c][r].indexOf(lyle);
@@ -135,7 +138,7 @@ function Map(cellSize) {
         var color = "#FFFF00";
         var gc = gameWindow.context;
         gc.strokeStyle = color;
-        gc.globalAlpha = 0.5;
+        gc.globalAlpha = 0.7;
         for(x = 0; x <= this.width/this.cellSize; x++) {
             gc.beginPath();
             gc.moveTo(x*this.cellSize,0);
@@ -150,8 +153,12 @@ function Map(cellSize) {
         }
         for(x = 0; x < this.cells.length; x++) {
             for(y = 0; y < this.cells[x].length; y++) {
+                gc.globalAlpha = 0.7;
                 gc.fillStyle = color;
                 gc.fillText((this.cells[x][y]).length, (x*this.cellSize)+(this.cellSize/2), (y*this.cellSize)+(this.cellSize/2));
+                gc.fillStyle = "#DDDDFF";
+                gc.globalAlpha = (this.cells[x][y]).length * 0.1;
+                gc.fillRect(x * this.cellSize, y * this.cellSize, cellSize, cellSize);
             }
         }
         gc.globalAlpha = 1;
