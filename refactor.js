@@ -1,7 +1,39 @@
 var mapWidth = 800;
 var mapHeight = 600;
 var lastUpdate = Date.now();
+
 var apartment = new Map(100);
+var block1 = new Block(275, 180, 366, 359);
+var block2 = new Block(399, 60, 120, 400, "#EE22AA");
+
+
+var lyle = {
+    canMove : true,
+    x : 53,
+    y : 53,
+    w : 48,
+    h : 48,
+    xSpeed : 0.15,
+    ySpeed : 0.11,
+    update : function () {
+        var gc = gameWindow.context;
+        gc.fillStyle = "#EE9977";
+        gc.fillRect(this.x, this.y, this.w, this.h);
+    }
+};
+
+function Block(x, y, w, h, color) {
+    this.x = x;
+    this.y = y;
+    this.w = w;
+    this.h = h;
+    this.color = color || "#7799EE";
+    this.update = function () {
+        var gc = gameWindow.context;
+        gc.fillStyle = this.color;
+        gc.fillRect(this.x, this.y, this.w, this.h);
+    }
+}
 
 function Map(cellSize) {
     this.cellSize = cellSize;
@@ -19,49 +51,98 @@ function Map(cellSize) {
         }
     };
     //
-    this.addObject = function(obj, x, y, w, h) {
+    this.addObject = function(obj) {
         var c, r;
-        for (c = Math.floor(x / this.cellSize); c <= Math.floor(x + w / this.cellSize); c++) {
-            for (r = Math.floor(y / this.cellSize); r <= Math.floor(y + h / this.cellSize); r++) {
+        for (c = Math.floor(obj.x / this.cellSize); c < (obj.x + obj.w) / this.cellSize; c++) {
+            for (r = Math.floor(obj.y / this.cellSize); r < (obj.y + obj.h) / this.cellSize; r++) {
                 this.cells[c][r].push(obj);
             }
         }
     };
     //Returns the actual x and y coordinates after an object's proposed movement
     this.move = function(obj, goalX, goalY) {
-        /*var movement = this.check(obj, goalX, goalY);
+        var movement = this.check(obj, goalX, goalY);
         var actualX = movement[0],
             actualY = movement[1];
-
-        return [actualX, actualY];*/
-        return [goalX, goalY];
+        this.update(obj, actualX, actualY);
+        return [actualX, actualY];
     };
-    //
+    //Prevents the object from being out of bounds
     this.check = function(obj, goalX, goalY) {
-
+        var actualX = goalX,
+        actualY = goalY;
+        if(goalX < 0) {
+            actualX = 0;
+        }
+        if(goalX + obj.w > mapWidth) {
+            actualX = mapWidth - obj.w;
+        }
+        if(goalY < 0) {
+            actualY = 0;
+        }
+        if(goalY + obj.h > mapHeight) {
+            actualY = mapHeight - obj.h;
+        }
+        return this.project(obj, actualX, actualY);
     };
-    //Update the map to reflect the change after movement
+    //Project the movement against other objects in the cells
+    this.project = function(obj, goalX, goalY) {
+        var c, r, i, block; //obj.x, obj.y = current; goalX, goalY = desired; actualX, actualY = actual
+        var actualX = goalX,
+            actualY = goalY;
+        for (c = Math.floor(goalX / this.cellSize); c < (goalX + obj.w) / this.cellSize; c++) {
+            for (r = Math.floor(goalY / this.cellSize); r < (goalY + obj.h) / this.cellSize; r++) {
+                for(i = 0; i < this.cells[c][r].length; i++) {
+                    block = this.cells[c][r][i];
+                    if(block !== obj) {
+                        if(this.overlaps(goalX, obj.y, obj.w, obj.h, block.x, block.y, block.w, block.h)) {
+                            actualX = obj.x;
+                        }
+                        if(this.overlaps(obj.x, goalY, obj.w, obj.h, block.x, block.y, block.w, block.h)) {
+
+                            actualY = obj.y;
+                        }
+                    }
+                }
+            }
+        }
+        return [actualX, actualY];
+    };
+    this.overlaps = function(x1, y1, w1, h1, x2, y2, w2, h2) {
+        return (x1 < x2 + w2 && x1 + w1 > x2 && y1 < y2 + h2 && y1 + h1 > y2);
+    };
+    //Update the map cells to reflect the change after movement
     this.update = function(obj, actualX, actualY) {
-
+        var c, r, index;
+        if(obj.x !== actualX || obj.y !== actualY) {
+            for (c = Math.floor(obj.x / this.cellSize); c < (obj.x + obj.w) / this.cellSize; c++) {
+                for (r = Math.floor(obj.y / this.cellSize); r < (obj.y + obj.h) / this.cellSize; r++) {
+                    index = this.cells[c][r].indexOf(obj);
+                    this.cells[c][r].splice(index, 1);
+                }
+            }
+            for (c = Math.floor(actualX / this.cellSize); c < (actualX + obj.w) / this.cellSize; c++) {
+                for (r = Math.floor(actualY / this.cellSize); r < (actualY + obj.h) / this.cellSize; r++) {
+                    index = this.cells[c][r].indexOf(lyle);
+                    this.cells[c][r].push(obj);
+                }
+            }
+        }
     };
-    //Project the movement
-    this.project = function(obj, x, y, w, h, goalX, goalY) {
-
-    };
-    //
+    //Draws debug information to the screen
     this.debug = function() {
         var x, y;
         var color = "#FFFF00";
         var gc = gameWindow.context;
         gc.strokeStyle = color;
         gc.globalAlpha = 0.5;
-        for(x = 0; x < this.width/this.cellSize; x++) {
+        for(x = 0; x <= this.width/this.cellSize; x++) {
             gc.beginPath();
             gc.moveTo(x*this.cellSize,0);
             gc.lineTo(x*this.cellSize,this.height);
             gc.stroke();
         }
-        for(y = 0; y < this.height/this.cellSize; y++ ) {
+        for(y = 0; y <= this.height/this.cellSize; y++ ) {
             gc.beginPath();
             gc.moveTo(0, y*this.cellSize);
             gc.lineTo(this.width, y*this.cellSize);
@@ -70,27 +151,12 @@ function Map(cellSize) {
         for(x = 0; x < this.cells.length; x++) {
             for(y = 0; y < this.cells[x].length; y++) {
                 gc.fillStyle = color;
-                gc.fillText((this.cells[x][y]).length, (x*this.cellSize)+25, (y*this.cellSize)+25);
+                gc.fillText((this.cells[x][y]).length, (x*this.cellSize)+(this.cellSize/2), (y*this.cellSize)+(this.cellSize/2));
             }
         }
         gc.globalAlpha = 1;
     }
 }
-
-var lyle = {
-    canMove : true,
-    x : 40,
-    y : 100,
-    w : 48,
-    h : 48,
-    xSpeed : 0.15,
-    ySpeed : 0.11,
-    update : function () {
-        var gc = gameWindow.context;
-        gc.fillStyle = "red";
-        gc.fillRect(this.x, this.y, this.w, this.h);
-    }
-};
 
 var gameWindow = {
     canvas : document.createElement("canvas"),
@@ -112,9 +178,11 @@ var gameWindow = {
         });
 
         window.addEventListener('keyup', function (e) { //Listener for key release
-            gameWindow.keys[e.keyCode] = false;
-            if(gameWindow.keys && !gameWindow.keys[32]) {
-                gameWindow.spacePressed = false;
+            if(gameWindow.keys) {
+                if(!gameWindow.keys[32]) {
+                    gameWindow.spacePressed = false;
+                }
+                gameWindow.keys[e.keyCode] = false;
             }
         });
 
@@ -154,6 +222,8 @@ function update() { //Handles both update and draw functions- this is probably a
         }
     }
 
+    block1.update();
+    block2.update();
     lyle.update();
 
     apartment.debug(); //Comment out when not debugging
@@ -161,16 +231,31 @@ function update() { //Handles both update and draw functions- this is probably a
 
 function startGame() {
     apartment.initializeCells();
-
+    apartment.addObject(lyle);
+    apartment.addObject(block1);
+    apartment.addObject(block2);
     gameWindow.start();
 }
 
+
 /*
+var i;
 var test = [];
-var item = {
-    x : 69,
-    y : 420
+var item1 = {
+    x : 69
 };
-test[item] = item;
-alert(test[item].x);
-*/
+var item2 = {
+    x : 420
+};
+var item3 = {
+    x : 666
+};
+
+test.push(item1, item2, item3);
+alert(test.indexOf(item2));
+var index = test.indexOf(item2);
+test.splice(index, 1);
+
+for(i = 0; i < test.length; i++) {
+    alert(test[i].x);
+}*/
