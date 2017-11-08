@@ -40,7 +40,7 @@ function Map(cellSize) {
     this.width = mapWidth;
     this.height = mapHeight;
     this.cells = [];
-    //
+    //Call this before using a map. Creates the needed number of cells based on cell size
     this.initializeCells = function() {
         var c, r;
         for(c = 0; c < this.width/cellSize; c++) {
@@ -50,7 +50,7 @@ function Map(cellSize) {
             }
         }
     };
-    //
+    //Adds an object to its appropriate cell location
     this.addObject = function(obj) {
         var c, r;
         for (c = Math.floor(obj.x / this.cellSize); c < (obj.x + obj.w) / this.cellSize; c++) {
