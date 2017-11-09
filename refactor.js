@@ -27,11 +27,16 @@ function Block(x, y, w, h, color) {
     this.y = y;
     this.w = w;
     this.h = h;
+    this.solid = true;
+    this.dialog = true;
     this.color = color || "#7799EE";
     this.update = function () {
         var gc = gameWindow.context;
         gc.fillStyle = this.color;
         gc.fillRect(this.x, this.y, this.w, this.h);
+    };
+    this.interact = function () {
+        console.log("Interacted");
     }
 }
 
@@ -94,7 +99,7 @@ function Map(cellSize) {
             for (r = Math.floor(goalY / this.cellSize); r < (goalY + obj.h) / this.cellSize; r++) {
                 for(i = 0; i < this.cells[c][r].length; i++) {
                     block = this.cells[c][r][i];
-                    if(block !== obj) {
+                    if(block !== obj && block.solid) {
                         if(this.overlaps(goalX, obj.y, obj.w, obj.h, block.x, block.y, block.w, block.h)) {
                             actualX = obj.x;
                         }
@@ -111,6 +116,32 @@ function Map(cellSize) {
     //Returns true if the two rectangles overlap
     this.overlaps = function(x1, y1, w1, h1, x2, y2, w2, h2) {
         return (x1 < x2 + w2 && x1 + w1 > x2 && y1 < y2 + h2 && y1 + h1 > y2);
+    };
+    //Interacts with an object
+    this.interact = function (obj, bufferX, bufferY) {
+        var c, r, i, item; //obj.x, obj.y = current; goalX, goalY = desired; actualX, actualY = actual
+        var col = Math.floor((obj.x - bufferX) / this.cellSize),
+            row = Math.floor((obj.y - bufferY) / this.cellSize),
+            colEnd = (obj.x + obj.w + bufferX) / this.cellSize,
+            rowEnd = (obj.y + obj.h + bufferY) / this.cellSize;
+        col = col < 0 ? 0 : col;
+        row = row < 0 ? 0 : row;
+        //colEnd = colEnd > this.width / cellSize ?
+        for (c = col; c < colEnd; c++) {
+            for (r = row; r < rowEnd; r++) {
+                for(i = 0; i < this.cells[c][r].length; i++) {
+                    item = this.cells[c][r][i];
+                    if(item !== obj && item.dialog) {
+                        if(this.overlaps(obj.x - bufferX, obj.y - bufferY, obj.w, obj.h, item.x, item.y, item.w, item.h) ||
+                            this.overlaps(obj.x + bufferX, obj.y + bufferY, obj.w, obj.h, item.x, item.y, item.w, item.h)) {
+                            item.interact();
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+
     };
     //Update the map cells to reflect the change after movement
     this.update = function(obj, actualX, actualY) {
@@ -165,6 +196,82 @@ function Map(cellSize) {
     }
 }
 
+var textbox = {
+    open : false, //Is the textbox open?
+    typing: false, //Is text being output?
+    //sprSrc : "https://i.imgur.com/ezVjs9g.png",
+    //img : new Image(),
+    img : null,
+    width : 770,
+    height : 130,
+    x : 15,
+    y : 454,
+    lineWidth : 52, //Max chars for a single line
+    lineHeight : 30, //How many pixels to jump down after a line
+    timerFast : 16, //Quick timer value
+    timerNormal : 35, //Normal timer value
+    textToPrint : "This text should never appear.", // Full text we want to print
+    printedText : "", // Section of the text printed so far
+    typeTimer : 35, // Timer to know when to print a new letter
+    typePosition : 0, //Type cursor position
+    update : function (dt) {
+    var gc = gameWindow.context;
+    gc.font="24px Consolas";
+    gc.textAlign = "left";
+    gc.fillStyle = "#DDDDDD";
+    //this.img.src = this.sprSrc;
+    //This horrible mess handles gradually typing text
+    if(this.typing) {
+        this.typeTimer -= dt; //Decrease timer
+        if (this.printedText.length !== this.textToPrint.length) {
+            this.typing = true;
+        }
+        if(this.typeTimer <= 0) { //Timer done, we need to print a new letter
+            this.typeTimer = this.timerNormal;
+            this.typePosition++; //Adjust position, use string.sub to get sub-string
+            this.printedText = this.textToPrint.substring(0,this.typePosition);
+        }
+        else if(this.printedText.length === this.textToPrint.length) {
+            this.typing = false;
+        }
+    }
+    //Oh my fucking god javascript why are you like this
+    var sub1;
+    var sub2;
+    var sub3;
+    var sub4;
+    gc.drawImage(this.img, this.x, this.y, this.width, this.height);
+    if(this.printedText.length <= this.lineWidth) {
+        gc.fillText(this.printedText, this.x + 15, this.y + 30);
+    }else if(this.printedText.length > this.lineWidth && this.printedText.length <= (this.lineWidth*2)) {
+        sub1 = this.printedText.substring(0, this.lineWidth);
+        sub2 = this.printedText.substring(this.lineWidth);
+        gc.fillText(sub1, this.x + 15, this.y + 30);
+        gc.fillText(sub2, this.x + 15, this.y + 30 + this.lineHeight);
+    }else if(this.printedText.length > (this.lineWidth*2) && this.printedText.length <= (this.lineWidth*3)) {
+        sub1 = this.printedText.substring(0, this.lineWidth);
+        sub2 = this.printedText.substring(this.lineWidth, this.lineWidth*2);
+        sub3 = this.printedText.substring(this.lineWidth*2);
+        gc.fillText(sub1, this.x + 15, this.y + 30);
+        gc.fillText(sub2, this.x + 15, this.y + 30 + this.lineHeight);
+        gc.fillText(sub3, this.x + 15, this.y + 30 + (this.lineHeight*2));
+    }else if(this.printedText.length > (this.lineWidth*3) && this.printedText.length <= (this.lineWidth*4)) {
+        sub1 = this.printedText.substring(0, this.lineWidth);
+        sub2 = this.printedText.substring(this.lineWidth, this.lineWidth*2);
+        sub3 = this.printedText.substring(this.lineWidth*2, this.lineWidth*3);
+        sub4 = this.printedText.substring(this.lineWidth*3);
+        gc.fillText(sub1, this.x + 15, this.y + 30);
+        gc.fillText(sub2, this.x + 15, this.y + 30 + this.lineHeight);
+        gc.fillText(sub3, this.x + 15, this.y + 30 + (this.lineHeight*2));
+        gc.fillText(sub4, this.x + 15, this.y + 30 + (this.lineHeight*3));
+        //fuck me this bullshit is the worst code ive ever written
+    }else {
+        alert("Asshole, the string's too damn long")
+    }
+
+}
+};
+
 var gameWindow = {
     canvas : document.createElement("canvas"),
     start : function() {
@@ -181,15 +288,16 @@ var gameWindow = {
             gameWindow.keys[e.keyCode] = true;
             if (e.keyCode === 32 && !gameWindow.spacePressed) { //Space bar code
                 gameWindow.spacePressed = true;
+                apartment.interact(lyle, 6, 6);
             }
         });
 
         window.addEventListener('keyup', function (e) { //Listener for key release
             if(gameWindow.keys) {
+                gameWindow.keys[e.keyCode] = false;
                 if(!gameWindow.keys[32]) {
                     gameWindow.spacePressed = false;
                 }
-                gameWindow.keys[e.keyCode] = false;
             }
         });
 
