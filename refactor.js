@@ -126,7 +126,8 @@ function Map(cellSize) {
             rowEnd = (obj.y + obj.h + bufferY) / this.cellSize;
         col = col < 0 ? 0 : col;
         row = row < 0 ? 0 : row;
-        //colEnd = colEnd > this.width / cellSize ?
+        colEnd = colEnd > (this.width / this.cellSize) ? (this.width / this.cellSize) - 1 : colEnd;
+        rowEnd = rowEnd > (this.height / this.cellSize) ? (this.height / this.cellSize) - 1 : rowEnd;
         for (c = col; c < colEnd; c++) {
             for (r = row; r < rowEnd; r++) {
                 for(i = 0; i < this.cells[c][r].length; i++) {
@@ -214,62 +215,64 @@ var textbox = {
     printedText : "", // Section of the text printed so far
     typeTimer : 35, // Timer to know when to print a new letter
     typePosition : 0, //Type cursor position
-    update : function (dt) {
-    var gc = gameWindow.context;
-    gc.font="24px Consolas";
-    gc.textAlign = "left";
-    gc.fillStyle = "#DDDDDD";
-    //this.img.src = this.sprSrc;
-    //This horrible mess handles gradually typing text
-    if(this.typing) {
-        this.typeTimer -= dt; //Decrease timer
-        if (this.printedText.length !== this.textToPrint.length) {
-            this.typing = true;
-        }
-        if(this.typeTimer <= 0) { //Timer done, we need to print a new letter
-            this.typeTimer = this.timerNormal;
-            this.typePosition++; //Adjust position, use string.sub to get sub-string
-            this.printedText = this.textToPrint.substring(0,this.typePosition);
-        }
-        else if(this.printedText.length === this.textToPrint.length) {
-            this.typing = false;
-        }
-    }
-    //Oh my fucking god javascript why are you like this
-    var sub1;
-    var sub2;
-    var sub3;
-    var sub4;
-    gc.drawImage(this.img, this.x, this.y, this.width, this.height);
-    if(this.printedText.length <= this.lineWidth) {
-        gc.fillText(this.printedText, this.x + 15, this.y + 30);
-    }else if(this.printedText.length > this.lineWidth && this.printedText.length <= (this.lineWidth*2)) {
-        sub1 = this.printedText.substring(0, this.lineWidth);
-        sub2 = this.printedText.substring(this.lineWidth);
-        gc.fillText(sub1, this.x + 15, this.y + 30);
-        gc.fillText(sub2, this.x + 15, this.y + 30 + this.lineHeight);
-    }else if(this.printedText.length > (this.lineWidth*2) && this.printedText.length <= (this.lineWidth*3)) {
-        sub1 = this.printedText.substring(0, this.lineWidth);
-        sub2 = this.printedText.substring(this.lineWidth, this.lineWidth*2);
-        sub3 = this.printedText.substring(this.lineWidth*2);
-        gc.fillText(sub1, this.x + 15, this.y + 30);
-        gc.fillText(sub2, this.x + 15, this.y + 30 + this.lineHeight);
-        gc.fillText(sub3, this.x + 15, this.y + 30 + (this.lineHeight*2));
-    }else if(this.printedText.length > (this.lineWidth*3) && this.printedText.length <= (this.lineWidth*4)) {
-        sub1 = this.printedText.substring(0, this.lineWidth);
-        sub2 = this.printedText.substring(this.lineWidth, this.lineWidth*2);
-        sub3 = this.printedText.substring(this.lineWidth*2, this.lineWidth*3);
-        sub4 = this.printedText.substring(this.lineWidth*3);
-        gc.fillText(sub1, this.x + 15, this.y + 30);
-        gc.fillText(sub2, this.x + 15, this.y + 30 + this.lineHeight);
-        gc.fillText(sub3, this.x + 15, this.y + 30 + (this.lineHeight*2));
-        gc.fillText(sub4, this.x + 15, this.y + 30 + (this.lineHeight*3));
-        //fuck me this bullshit is the worst code ive ever written
-    }else {
-        alert("Asshole, the string's too damn long")
-    }
+    drawText : function (dt, text) {
 
-}
+    },
+    update : function (dt) {
+        var gc = gameWindow.context;
+        gc.font="24px Consolas";
+        gc.textAlign = "left";
+        gc.fillStyle = "#DDDDDD";
+        //this.img.src = this.sprSrc;
+        //This horrible mess handles gradually typing text
+        if(this.typing) {
+            this.typeTimer -= dt; //Decrease timer
+            if (this.printedText.length !== this.textToPrint.length) {
+                this.typing = true;
+            }
+            if(this.typeTimer <= 0) { //Timer done, we need to print a new letter
+                this.typeTimer = this.timerNormal;
+                this.typePosition++; //Adjust position, use string.sub to get sub-string
+                this.printedText = this.textToPrint.substring(0,this.typePosition);
+            }
+            else if(this.printedText.length === this.textToPrint.length) {
+                this.typing = false;
+            }
+        }
+        var sub1;
+        var sub2;
+        var sub3;
+        var sub4;
+        gc.drawImage(this.img, this.x, this.y, this.width, this.height);
+        if(this.printedText.length <= this.lineWidth) {
+            gc.fillText(this.printedText, this.x + 15, this.y + 30);
+        }else if(this.printedText.length > this.lineWidth && this.printedText.length <= (this.lineWidth*2)) {
+            sub1 = this.printedText.substring(0, this.lineWidth);
+            sub2 = this.printedText.substring(this.lineWidth);
+            gc.fillText(sub1, this.x + 15, this.y + 30);
+            gc.fillText(sub2, this.x + 15, this.y + 30 + this.lineHeight);
+        }else if(this.printedText.length > (this.lineWidth*2) && this.printedText.length <= (this.lineWidth*3)) {
+            sub1 = this.printedText.substring(0, this.lineWidth);
+            sub2 = this.printedText.substring(this.lineWidth, this.lineWidth*2);
+            sub3 = this.printedText.substring(this.lineWidth*2);
+            gc.fillText(sub1, this.x + 15, this.y + 30);
+            gc.fillText(sub2, this.x + 15, this.y + 30 + this.lineHeight);
+            gc.fillText(sub3, this.x + 15, this.y + 30 + (this.lineHeight*2));
+        }else if(this.printedText.length > (this.lineWidth*3) && this.printedText.length <= (this.lineWidth*4)) {
+            sub1 = this.printedText.substring(0, this.lineWidth);
+            sub2 = this.printedText.substring(this.lineWidth, this.lineWidth*2);
+            sub3 = this.printedText.substring(this.lineWidth*2, this.lineWidth*3);
+            sub4 = this.printedText.substring(this.lineWidth*3);
+            gc.fillText(sub1, this.x + 15, this.y + 30);
+            gc.fillText(sub2, this.x + 15, this.y + 30 + this.lineHeight);
+            gc.fillText(sub3, this.x + 15, this.y + 30 + (this.lineHeight*2));
+            gc.fillText(sub4, this.x + 15, this.y + 30 + (this.lineHeight*3));
+            //fuck me this bullshit is the worst code ive ever written
+        }else {
+            alert("Asshole, the string's too damn long")
+        }
+
+    }
 };
 
 var gameWindow = {
