@@ -1,6 +1,9 @@
 var mapWidth = 800;
 var mapHeight = 600;
+var images = [];
 var lastUpdate = Date.now();
+
+var testAnim;
 
 var apartment = new Map(100);
 var block1 = new Block(200, 180, 366, 359);
@@ -187,6 +190,8 @@ function Map(cellSize) {
             for(y = 0; y < this.cells[x].length; y++) {
                 gc.globalAlpha = 0.7;
                 gc.fillStyle = color;
+                gc.font="16px Consolas";
+                gc.textAlign = "center";
                 gc.fillText((this.cells[x][y]).length, (x*this.cellSize)+(this.cellSize/2), (y*this.cellSize)+(this.cellSize/2));
                 gc.fillStyle = "#DDDDFF";
                 gc.globalAlpha = (this.cells[x][y]).length * 0.1;
@@ -211,12 +216,16 @@ var textbox = {
     lineHeight : 30, //How many pixels to jump down after a line
     timerFast : 16, //Quick timer value
     timerNormal : 35, //Normal timer value
-    textToPrint : "This text should never appear.", // Full text we want to print
+    textToPrint : ["This text should never appear."], // Full text we want to print, should be an array of max length 4
     printedText : "", // Section of the text printed so far
     typeTimer : 35, // Timer to know when to print a new letter
     typePosition : 0, //Type cursor position
-    drawText : function (dt, text) {
-
+    formatTextToPrint : function (dt, text) {
+        var gc = gameWindow.context;
+        gc.font="24px Consolas";
+        gc.textAlign = "left";
+        gc.fillStyle = "#DDDDDD";
+        
     },
     update : function (dt) {
         var gc = gameWindow.context;
@@ -323,12 +332,15 @@ function update() { //Handles both update and draw functions- this is probably a
         var dx = 0, dy = 0;
         if (gameWindow.keys[37]) { //L
             dx = Math.floor(-lyle.xSpeed * dt);
+            testAnim.pauseAtBeginning();
         }
         if (gameWindow.keys[39]) { //R
             dx = Math.ceil(lyle.xSpeed * dt);
+            testAnim.resumeAnimation();
         }
         if (gameWindow.keys[38]) { //U
             dy = Math.floor(-lyle.xSpeed * dt);
+            testAnim.flip();
         }
         if (gameWindow.keys[40]) { //D
             dy = Math.ceil(lyle.xSpeed * dt);
@@ -344,36 +356,80 @@ function update() { //Handles both update and draw functions- this is probably a
     block2.update();
     lyle.update();
 
+    testAnim.update(dt, 31, 38);
+
     apartment.debug(); //Comment out when not debugging
 }
 
 function startGame() {
+    preload(
+        "https://i.imgur.com/seoBUYH.png", // 0: Lyle placeholders
+        "https://i.imgur.com/oQeiIiH.png" // 1: Kiana placeholders
+    );
     apartment.initializeCells();
     apartment.addObject(lyle);
     apartment.addObject(block1);
     apartment.addObject(block2);
+    testAnim = new Animation(images[1], 0, 1, 320, 384);
     gameWindow.start();
+    }
+
+function preload() {
+    for (var i = 0; i < arguments.length; i++) {
+        images[i] = new Image();
+        images[i].src = preload.arguments[i];
+    }
 }
 
+function Animation(img, startIndex, endIndex, width, height) {
+    this.img = img;
+    this.startIndex = startIndex;
+    this.endIndex = endIndex;
+    this.curIndex = startIndex;
+    this.width = width;
+    this.height = height;
+    this.frameCounter = 0;
+    this.frameTimer = 200;
+    this.animated = true;
+    this.isOriginalOrientation = true;
 
-/*
-var i;
-var test = [];
-var item1 = {
-    x : 69
-};
-var item2 = {
-    x : 420
-};
-var item3 = {
-    x : 666
-};
+    this.update = function (dt, x, y) {
+        var gc = gameWindow.context;
+        if(this.isOriginalOrientation) {
+            gc.drawImage(this.img, this.curIndex * this.width, 0, this.width, this.height, x, y, this.width, this.height);
+        } else {
+            gc.scale(-1,1);
+            gc.drawImage(this.img, this.curIndex * this.width, 0, this.width, this.height, x - mapWidth, y, this.width, this.height);
+            gc.setTransform(1,0,0,1,0,0);
+        }
 
-test.push(item1, item2, item3);
-alert(test.indexOf(item2));
-var index = test.indexOf(item2);
-test.splice(index, 1);
+        if(this.animated) {
+            this.incrementCurIndex(dt);
+        }
 
-for(i = 0; i < test.length; i++) {
-    alert(test[i].x);
-}*/
+    };
+    this.incrementCurIndex = function (dt) {
+        if(this.frameCounter > this.frameTimer) {
+            this.frameCounter = 0;
+            if(this.curIndex === this.endIndex) {
+                this.curIndex = this.startIndex;
+            } else {
+                this.curIndex++;
+            }
+        } else {
+            this.frameCounter += dt;
+        }
+
+    };
+    this.resumeAnimation = function () {
+        this.animated = true;
+    };
+    this.pauseAtBeginning = function () {
+        this.animated = false;
+        this.frameCounter = 0;
+        this.curIndex = startIndex;
+    };
+    this.flip = function () {
+        this.isOriginalOrientation = !this.isOriginalOrientation;
+    }
+}
