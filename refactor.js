@@ -205,8 +205,6 @@ function Map(cellSize) {
 var textbox = {
     open : false, //Is the textbox open?
     typing: false, //Is text being output?
-    //sprSrc : "https://i.imgur.com/ezVjs9g.png",
-    //img : new Image(),
     img : null,
     width : 770,
     height : 130,
@@ -232,7 +230,6 @@ var textbox = {
         gc.font="24px Consolas";
         gc.textAlign = "left";
         gc.fillStyle = "#DDDDDD";
-        //this.img.src = this.sprSrc;
         //This horrible mess handles gradually typing text
         if(this.typing) {
             this.typeTimer -= dt; //Decrease timer
@@ -279,6 +276,27 @@ var textbox = {
             //fuck me this bullshit is the worst code ive ever written
         }else {
             alert("Asshole, the string's too damn long")
+            /*
+            function wrapText(context, text, x, y, maxWidth, lineHeight) {
+            var words = text.split(' ');
+            var line = '';
+
+            for(var n = 0; n < words.length; n++) {
+              var testLine = line + words[n] + ' ';
+              var metrics = context.measureText(testLine);
+              var testWidth = metrics.width;
+              if (testWidth > maxWidth && n > 0) {
+                context.fillText(line, x, y);
+                line = words[n] + ' ';
+                y += lineHeight;
+              }
+              else {
+                line = testLine;
+              }
+            }
+            context.fillText(line, x, y);
+          }
+             */
         }
 
     }
@@ -336,7 +354,7 @@ function update() { //Handles both update and draw functions- this is probably a
         }
         if (gameWindow.keys[39]) { //R
             dx = Math.ceil(lyle.xSpeed * dt);
-            testAnim.resumeAnimation();
+            testAnim.resume();
         }
         if (gameWindow.keys[38]) { //U
             dy = Math.floor(-lyle.xSpeed * dt);
@@ -421,7 +439,7 @@ function Animation(img, startIndex, endIndex, width, height) {
         }
 
     };
-    this.resumeAnimation = function () {
+    this.resume = function () {
         this.animated = true;
     };
     this.pauseAtBeginning = function () {
