@@ -38,50 +38,78 @@ var textbox = {
     //height : 130, //Can remove?
     x : 15,
     y : 454,
-    lineWidth : 52, //Max chars for a single line
-    lineHeight : 30, //How many pixels to jump down after a line
-    timerNormal : 35, //Normal timer value
-    //textToPrint : "This text should never appear.", // Full text we want to print, should be an array of max length 4
+    lineWidth : 754, //Max chars for a single line
+    lineHeight : 28, //How many pixels to jump down after a line
+    timerNormal : 35, //Normal timer value //Normally 35, 100 for testing
     printedText : "", // Section of the text printed so far
     typeTimer : 35, // Timer to know when to print a new letter
     typePosition : 0, //Type cursor position
     typeWordPos : 0, //Type cursor position in the current word
     typeArrayPos : 0, //Type cursor position in the array
-    wordsArray : [], //The array for current dialogue
+    wordsArray : [], //The array for entire current dialogue
     updateWordArray : function (str) {
         this.wordsArray = str.split(' ');
     },
-    drawText : function (gc) {
-        var yOffset = 0;
+    formatText : function (gc) {
+        var yOffset, metrics, testWidth;
+        yOffset = 0;
         if(this.typeWordPos > this.wordsArray[this.typeArrayPos].length) {
             if(this.wordsArray[this.typeArrayPos+1]) {
                 this.typeArrayPos++;
                 this.typeWordPos = 0;
             }
         }
+        //Print all the text leading up to the current word being printed
         this.printedText = "";
         for(var i = 0; i < this.typeArrayPos; i++) {
             if(this.wordsArray[i] === "#") {
-                console.log("Skipping Octothorpe")
+                //print the entire word array up to this point with the current offset
+                //reset the words to print to and increase the offset
+                this.drawText(gc, yOffset);
+                yOffset += this.lineHeight;
+                this.printedText = "";
             } else {
-                this.printedText += (this.wordsArray[i] + " ")
+                metrics = gc.measureText(this.printedText);
+                testWidth = metrics.width;
+                if(testWidth > this.lineWidth) {
+                    this.drawText(gc, yOffset);
+                    yOffset += this.lineHeight;
+                    this.printedText = "";
+                } else {
+                    this.printedText += (this.wordsArray[i] + " ")
+                }
             }
         }
-        this.printedText += this.wordsArray[this.typeArrayPos].substring(0,this.typeWordPos);
+
+        var wordChunk = (this.wordsArray[this.typeArrayPos]).substring(0,this.typeWordPos);
+        if(wordChunk === "#") {
+            //Auto-advance word position. New line handling is done in for loop
+            this.typeWordPos++;
+        } else {
+            this.printedText += wordChunk
+        }
+
+        //check that the current printedText string is not longer than the line width
+        //if it is, cut it, print, increase offset, reset printedwords and repeat until it is less than the width
+        /*metrics = gc.measureText(this.printedText);
+        testWidth = metrics.width;
+        if(testWidth > this.lineWidth) {
+            this.drawText(gc, yOffset);
+            yOffset += this.lineHeight;
+            this.printedText = "";
+        }*/
 
 
+        this.drawText(gc, yOffset);
 
-
-
-
-
-        gc.fillText(this.printedText, this.x + 15, this.y + 30);
     },
-    update : function (dt) {
-        var gc = gameWindow.context;
-        gc.font="24px Consolas";
+    drawText : function (gc, yOffset) {
+        gc.font="22px Consolas";
         gc.textAlign = "left";
         gc.fillStyle = "#DDDDDD";
+        gc.fillText(this.printedText, this.x + 16, this.y + 32 + yOffset);
+    },
+    update : function (dt) {
         //This horrible mess handles gradually typing text
         if(this.typing) {
             this.typeTimer -= dt; //Decrease timer
@@ -94,41 +122,16 @@ var textbox = {
                 this.typeWordPos++;
                 console.log(this.typeWordPos)
             }
-            else if(this.typeArrayPos >= this.wordsArray.length - 1) {
+            else if(this.typeArrayPos > this.wordsArray.length - 1) {
                 //console.log(this.typeArrayPos + " >= " + this.wordsArray.length + " : Stopping");
                 this.typing = false;
             }
         }
+        //Draw the chatbox and text
+        var gc = gameWindow.context;
         gc.drawImage(images[0], this.x, this.y);
-        this.drawText(gc);
-
-        if(this.printedText.length <= this.lineWidth) {
-            //???
-        }
-            /*
-            function wrapText(context, text, x, y, maxWidth, lineHeight) {
-            var words = text.split(' ');
-            var line = '';
-
-            for(var n = 0; n < words.length; n++) {
-              var testLine = line + words[n] + ' ';
-              var metrics = context.measureText(testLine);
-              var testWidth = metrics.width;
-              if (testWidth > maxWidth && n > 0) {
-                context.fillText(line, x, y);
-                line = words[n] + ' ';
-                y += lineHeight;
-              }
-              else {
-                line = testLine;
-              }
-            }
-            context.fillText(line, x, y);
-          }
-             */
-
-
-    }
+        this.formatText(gc);
+     }
 };
 
 function update() { //Handles both update and draw functions- this is probably a no no
