@@ -1,15 +1,25 @@
 var mapWidth = 800;
 var mapHeight = 600;
 var images = [];
+var animations = [];
 var lastUpdate = Date.now();
 
-var testAnim;
+var testDialogues = {
+    pointer : 0,
+    curLine : 0,
+    pointerReset : 0,
+    0 : [
+        [0, 0, "This is a test of the new dialogue system. # This should be on a new line."],
+        [0, 0, "Isn't this neat?"],
+        [1, 1, "Yeah, I guess it is."]
+    ],
+    1: null
+};
 
 var apartment = new Map(100);
-var block1 = new Block(200, 180, 366, 359);
-var block2 = new Block(399, 60, 120, 400, "#EE22AA");
-
-
+var block1 = new Item(200, 180, 366, 359);
+var block2 = new Item(399, 60, 120, 400, "#EE22AA");
+var block3 = new Item(80, 350, 32, 32, "#996666", true, true, testDialogues);
 var lyle = {
     canMove : true,
     x : 53,
@@ -25,21 +35,40 @@ var lyle = {
     }
 };
 
-function Block(x, y, w, h, color) {
+function Item(x, y, w, h, color, solid, prop, dialogues) {
     this.x = x;
     this.y = y;
     this.w = w;
     this.h = h;
-    this.solid = true;
-    this.dialog = true;
     this.color = color || "#7799EE";
+    this.solid = solid || true;
+    this.prop = prop || false;
+    this.dialogues = dialogues || null;
     this.update = function () {
         var gc = gameWindow.context;
         gc.fillStyle = this.color;
         gc.fillRect(this.x, this.y, this.w, this.h);
     };
     this.interact = function () {
-        console.log("Interacted");
+        console.log(this.dialogues[this.dialogues.pointer][this.dialogues.curLine]);
+        //This executes when space is pressed
+            //Does the current dialogue being pointed to exist?
+            //If no, display error message
+                //If yes, does the current line of dialogue exist?
+                //If yes, send dialogue to chatbox, advance line pointer by one
+                //If no, send null to chatbox to end dialogue, advance dialogue pointer by one if that dialogue exists and reset line pointer
+        if(this.dialogues[this.dialogues.pointer][this.dialogues.curLine] && this.dialogues[this.dialogues.pointer][this.dialogues.curLine] !== null) {
+            console.log("if");
+            chatbox.nextDialogue(this.dialogues[this.dialogues.pointer][this.dialogues.curLine]);
+            this.dialogues.curLine++;
+        } else {
+            console.log("else");
+            chatbox.nextDialogue(null);
+            this.dialogues.curLine = 0;
+            if(this.dialogues[this.dialogues.pointer+1] && this.dialogues[this.dialogues.pointer+1] !== null) {
+                this.dialogues.pointer++;
+            }
+        }
     }
 }
 
@@ -135,7 +164,7 @@ function Map(cellSize) {
             for (r = row; r < rowEnd; r++) {
                 for(i = 0; i < this.cells[c][r].length; i++) {
                     item = this.cells[c][r][i];
-                    if(item !== obj && item.dialog) {
+                    if(item !== obj && item.prop) {
                         if(this.overlaps(obj.x - bufferX, obj.y - bufferY, obj.w, obj.h, item.x, item.y, item.w, item.h) ||
                             this.overlaps(obj.x + bufferX, obj.y + bufferY, obj.w, obj.h, item.x, item.y, item.w, item.h)) {
                             item.interact();
@@ -213,10 +242,42 @@ var chatbox = {
     typeTimer : 35, // Timer to know when to print a new letter
     typeWordPos : 0, //Type cursor position in the current word
     typeArrayPos : 0, //Type cursor position in the array
-    wordsArray : [], //The array for entire current dialogue
+    wordsArray : [], //The array for current dialogue
     printedText : "", // Section of the text printed so far
-    updateWordArray : function (str) {
-        this.wordsArray = str.split(' ');
+    dialogueArray : [], //The array for entire dialogue
+    portraitAnimation : null,
+    nextDialogue : function (dialogue) {
+        /*
+        if (textbox.open && textbox.typing) {
+            textbox.printedText = textbox.textToPrint;
+            textbox.typing = false;
+        } else if (textbox.open && !textbox.typing) {
+            dialogueLine(++scriptIndex)
+        } else if (!textbox.open && lyle.moveable) {
+            for (var i = 0; i < interactables.length; i++) {
+                var o = interactables[i];
+                if (lyle.x >= o.x-(o.width+4) && lyle.x <= o.x+(o.width+4) && lyle.y <= o.y+(o.height/2) && lyle.y >= o.y-(o.height/2)) {
+                    textbox.open = true;
+                    lyle.moveable = false;
+                    scriptIndex = o.dialogues[o[0]];
+                    if (o.dialogues[o[0]+1]) {
+                        o[0] = o[0] + 1;
+                    }
+                dialogueLine(scriptIndex);
+                }
+            }
+        }
+         */
+        if(dialogue === null) {
+            lyle.canMove = true;
+            this.open = false;
+        } else {
+            lyle.canMove = false;
+            this.open = true;
+            this.typing = true
+            this.wordsArray = dialogue[2].split(' ');
+            this.portraitAnimation = animations[dialogue[0]];
+        }
     },
     formatText : function (gc) {
         var yOffset, metrics, testWidth;
@@ -303,10 +364,65 @@ var chatbox = {
         }
         //Draw the chatbox and text
         var gc = gameWindow.context;
+        if(this.portraitAnimation !== null) {
+            this.portraitAnimation.update(dt, 20, 70)
+        }
         gc.drawImage(images[0], this.x, this.y);
         this.formatText(gc);
     }
 };
+
+function Animation(img, startIndex, endIndex, row, width, height) {
+    this.img = img;
+    this.startIndex = startIndex;
+    this.endIndex = endIndex;
+    this.curIndex = startIndex;
+    this.row = row;
+    this.width = width;
+    this.height = height;
+    this.frameCounter = 0;
+    this.frameTimer = 200;
+    this.animated = true;
+    this.isOriginalOrientation = true;
+
+    this.update = function (dt, x, y) {
+        var gc = gameWindow.context;
+        if(this.isOriginalOrientation) {
+            gc.drawImage(this.img, this.curIndex * this.width, this.row, this.width, this.height, x, y, this.width, this.height);
+        } else {
+            gc.scale(-1,1);
+            gc.drawImage(this.img, this.curIndex * this.width, this.row, this.width, this.height, x - mapWidth, y, this.width, this.height);
+            gc.setTransform(1,0,0,1,0,0);
+        }
+        if(this.animated) {
+            this.incrementCurIndex(dt);
+        }
+    };
+    this.incrementCurIndex = function (dt) {
+        if(this.frameCounter > this.frameTimer) {
+            this.frameCounter = 0;
+            if(this.curIndex === this.endIndex) {
+                this.curIndex = this.startIndex;
+            } else {
+                this.curIndex++;
+            }
+        } else {
+            this.frameCounter += dt;
+        }
+
+    };
+    this.resume = function () {
+        this.animated = true;
+    };
+    this.pauseAtBeginning = function () {
+        this.animated = false;
+        this.frameCounter = 0;
+        this.curIndex = startIndex;
+    };
+    this.flip = function () {
+        this.isOriginalOrientation = !this.isOriginalOrientation;
+    }
+}
 
 var gameWindow = {
     canvas : document.createElement("canvas"),
@@ -356,15 +472,12 @@ function update() { //Handles both update and draw functions- this is probably a
         var dx = 0, dy = 0;
         if (gameWindow.keys[37]) { //L
             dx = Math.floor(-lyle.xSpeed * dt);
-            testAnim.pauseAtBeginning();
         }
         if (gameWindow.keys[39]) { //R
             dx = Math.ceil(lyle.xSpeed * dt);
-            testAnim.resume();
         }
         if (gameWindow.keys[38]) { //U
             dy = Math.floor(-lyle.xSpeed * dt);
-            testAnim.flip();
         }
         if (gameWindow.keys[40]) { //D
             dy = Math.ceil(lyle.xSpeed * dt);
@@ -378,23 +491,28 @@ function update() { //Handles both update and draw functions- this is probably a
 
     block1.update();
     block2.update();
+    block3.update();
     lyle.update();
 
-    testAnim.update(dt, 31, 38);
-
     apartment.debug(); //Comment out when not debugging
+
+    if (chatbox.open) {
+        chatbox.update(dt);
+    }
 }
 
 function startGame() {
     preload(
-        "https://i.imgur.com/seoBUYH.png", // 0: Lyle placeholders
-        "https://i.imgur.com/oQeiIiH.png" // 1: Kiana placeholders
+        "https://i.imgur.com/ezVjs9g.png", // 00 : Textbox
+        "https://i.imgur.com/seoBUYH.png", // 01 : Lyle portrait placeholders
+        "https://i.imgur.com/oQeiIiH.png"  // 02 : Kiana portrait placeholders
     );
+    loadAnimations();
     apartment.initializeCells();
     apartment.addObject(lyle);
     apartment.addObject(block1);
     apartment.addObject(block2);
-    testAnim = new Animation(images[1], 0, 1, 320, 384);
+    apartment.addObject(block3);
     gameWindow.start();
     }
 
@@ -405,55 +523,7 @@ function preload() {
     }
 }
 
-function Animation(img, startIndex, endIndex, width, height) {
-    this.img = img;
-    this.startIndex = startIndex;
-    this.endIndex = endIndex;
-    this.curIndex = startIndex;
-    this.width = width;
-    this.height = height;
-    this.frameCounter = 0;
-    this.frameTimer = 200;
-    this.animated = true;
-    this.isOriginalOrientation = true;
-
-    this.update = function (dt, x, y) {
-        var gc = gameWindow.context;
-        if(this.isOriginalOrientation) {
-            gc.drawImage(this.img, this.curIndex * this.width, 0, this.width, this.height, x, y, this.width, this.height);
-        } else {
-            gc.scale(-1,1);
-            gc.drawImage(this.img, this.curIndex * this.width, 0, this.width, this.height, x - mapWidth, y, this.width, this.height);
-            gc.setTransform(1,0,0,1,0,0);
-        }
-
-        if(this.animated) {
-            this.incrementCurIndex(dt);
-        }
-
-    };
-    this.incrementCurIndex = function (dt) {
-        if(this.frameCounter > this.frameTimer) {
-            this.frameCounter = 0;
-            if(this.curIndex === this.endIndex) {
-                this.curIndex = this.startIndex;
-            } else {
-                this.curIndex++;
-            }
-        } else {
-            this.frameCounter += dt;
-        }
-
-    };
-    this.resume = function () {
-        this.animated = true;
-    };
-    this.pauseAtBeginning = function () {
-        this.animated = false;
-        this.frameCounter = 0;
-        this.curIndex = startIndex;
-    };
-    this.flip = function () {
-        this.isOriginalOrientation = !this.isOriginalOrientation;
-    }
+function loadAnimations() {
+    animations[0] = new Animation(images[1], 0, 1, 0, 320, 384); // 00 : Lyle placeholder ports
+    animations[1] = new Animation(images[2], 0, 1, 0, 320, 384); // 01 : Kiana placeholder ports
 }
