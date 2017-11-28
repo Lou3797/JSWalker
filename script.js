@@ -1,343 +1,343 @@
-var images = []; //All Images
-function startGame() {
-    preload(
-        "https://i.imgur.com/1x7VOxs.png", //0: Lyle normal 1
-        "https://i.imgur.com/ZGThKjp.png", //1: Lyle normal 2
-        "https://i.imgur.com/j9xsRqU.png", //2: Kiana normal 1
-        "https://i.imgur.com/5toPRKK.png", //3: Kiana normal 2
-        "https://i.imgur.com/azuIOiL.png", //4: Jackie normal 1
-        "https://i.imgur.com/v9ReXAm.png", //5: Jackie normal 2
-        "https://i.imgur.com/h0J04Gl.png", //6: Lyle sprite temp
-        "https://i.imgur.com/f46wJor.png", //7: Kiana sprite temp
-        "https://i.imgur.com/0U3fmxe.png", //8: Jackie sprite temp
-        "https://i.imgur.com/ezVjs9g.png" //9: textbox sprite
-    );
-    textbox.img = images[9];
-    lyle.sprites = [images[6]];
-    kiana.sprites = [images[7]];
-    jackie.sprites = [images[8]];
-    portrait.portList = [null, images[0], images[1], images[2], images[3], images[4], images[5]];
+var mapWidth = 800;
+var mapHeight = 600;
+var images = [];
+var lastUpdate = Date.now();
 
-    apartment.initializeGrid();
-    apartment.addObject(kiana);
-    apartment.addObject(jackie);
+var testAnim;
 
-    gameWindow.start();
+var apartment = new Map(100);
+var block1 = new Block(200, 180, 366, 359);
+var block2 = new Block(399, 60, 120, 400, "#EE22AA");
+
+
+var lyle = {
+    canMove : true,
+    x : 53,
+    y : 53,
+    w : 48,
+    h : 48,
+    xSpeed : 0.15,
+    ySpeed : 0.11,
+    update : function () {
+        var gc = gameWindow.context;
+        gc.fillStyle = "#EE9977";
+        gc.fillRect(this.x, this.y, this.w, this.h);
+    }
+};
+
+function Block(x, y, w, h, color) {
+    this.x = x;
+    this.y = y;
+    this.w = w;
+    this.h = h;
+    this.solid = true;
+    this.dialog = true;
+    this.color = color || "#7799EE";
+    this.update = function () {
+        var gc = gameWindow.context;
+        gc.fillStyle = this.color;
+        gc.fillRect(this.x, this.y, this.w, this.h);
+    };
+    this.interact = function () {
+        console.log("Interacted");
+    }
 }
 
-var interactables; //Array holding all possible interactable objects
-var collidables; //You can't run through this shit
-var drawOrder; //Oh god
-var lastUpdate = Date.now();
-var apartment = new Map(100);
-
-//Stores a 2D array of cells on the map that contain references to objects that occupy the cell
 function Map(cellSize) {
     this.cellSize = cellSize;
-    this.width = 800;
-    this.height = 600;
-    this.grid = [];
-    this.initializeGrid = function() {
-        for(var x = 0; x < this.width/cellSize; x++) {
-            this.grid[x] = [];
-            for(var y = 0; y < this.height/cellSize; y++) {
-                this.grid[x][y] = []; //For each x,y grid coordinate there exists a list of references to all objects there
+    this.width = mapWidth;
+    this.height = mapHeight;
+    this.cells = [];
+    //Call this before using a map. Creates the needed number of cells based on cell size
+    this.initializeCells = function() {
+        var c, r;
+        for(c = 0; c < this.width/cellSize; c++) {
+            this.cells[c] = [];
+            for(r = 0; r < this.height/cellSize; r++) {
+                this.cells[c][r] = []; //For each x,y cell coordinate there exists a list of references to all objects there
             }
         }
     };
-    //obj has obj.x, obj.y, obj.width, obj.height
+    //Adds an object to its appropriate cell location
     this.addObject = function(obj) {
-        var leftBound = obj.x - (obj.width/2);
-        var rightBound = obj.x + (obj.width/2);
-        var topBound = obj.y - (obj.height/2);
-        var bottomBound = obj.y;
-        for(var x = Math.floor(leftBound/this.cellSize); x <= Math.floor(rightBound/this.cellSize) ;x++) {
-            for(var y = Math.floor(topBound/this.cellSize); y <= Math.floor(bottomBound/this.cellSize) ;y++) {
-                this.grid[x][y].push(obj);
+        var c, r;
+        for (c = Math.floor(obj.x / this.cellSize); c < (obj.x + obj.w) / this.cellSize; c++) {
+            for (r = Math.floor(obj.y / this.cellSize); r < (obj.y + obj.h) / this.cellSize; r++) {
+                this.cells[c][r].push(obj);
             }
         }
     };
-    //obj has obj.x, obj.y, obj.width, obj.height
-    this.getIntersectingGrids = function(obj) {
-        var intersections = [];
-        var leftBound = obj.x - (obj.width/2);
-        var rightBound = obj.x + (obj.width/2);
-        var topBound = obj.y - (obj.height/2);
-        var bottomBound = obj.y;
-        for(var x = Math.floor(leftBound/this.cellSize); x <= Math.floor(rightBound/this.cellSize) ;x++) {
-            for(var y = Math.floor(topBound/this.cellSize); y <= Math.floor(bottomBound/this.cellSize) ;y++) {
-                intersections.push(this.grid[x][y]);
+    //Returns the actual x and y coordinates after an object's proposed movement
+    this.move = function(obj, goalX, goalY) {
+        var movement = this.check(obj, goalX, goalY);
+        var actualX = movement[0],
+            actualY = movement[1];
+        this.update(obj, actualX, actualY);
+        return [actualX, actualY];
+    };
+    //Prevents the object from being out of bounds
+    this.check = function(obj, goalX, goalY) {
+        var actualX = goalX,
+        actualY = goalY;
+        if(goalX < 0) {
+            actualX = 0;
+        }
+        if(goalX + obj.w > mapWidth) {
+            actualX = mapWidth - obj.w;
+        }
+        if(goalY < 0) {
+            actualY = 0;
+        }
+        if(goalY + obj.h > mapHeight) {
+            actualY = mapHeight - obj.h;
+        }
+        return this.project(obj, actualX, actualY);
+    };
+    //Project the movement against other objects in the cells
+    this.project = function(obj, goalX, goalY) {
+        var c, r, i, block; //obj.x, obj.y = current; goalX, goalY = desired; actualX, actualY = actual
+        var actualX = goalX,
+            actualY = goalY;
+        for (c = Math.floor(goalX / this.cellSize); c < (goalX + obj.w) / this.cellSize; c++) {
+            for (r = Math.floor(goalY / this.cellSize); r < (goalY + obj.h) / this.cellSize; r++) {
+                for(i = 0; i < this.cells[c][r].length; i++) {
+                    block = this.cells[c][r][i];
+                    if(block !== obj && block.solid) {
+                        if(this.overlaps(goalX, obj.y, obj.w, obj.h, block.x, block.y, block.w, block.h)) {
+                            actualX = obj.x;
+                        }
+                        if(this.overlaps(obj.x, goalY, obj.w, obj.h, block.x, block.y, block.w, block.h)) {
+                            actualY = obj.y;
+                        }
+
+                    }
+                }
             }
         }
-        return intersections; //An array containing the arrays of all possible collisions
+        return [actualX, actualY];
     };
-    this.getIntersectingGridsAtFuturePosition = function(obj, projX, projY) {
-        var intersections = [];
-        var leftBound = projX - (obj.width/2);
-        var rightBound = projX + (obj.width/2);
-        var topBound = projY - (obj.height/2);
-        var bottomBound = projY;
-        for(var x = Math.floor(leftBound/this.cellSize); x <= Math.floor(rightBound/this.cellSize) ;x++) {
-            for(var y = Math.floor(topBound/this.cellSize); y <= Math.floor(bottomBound/this.cellSize) ;y++) {
-                intersections.push(this.grid[x][y]);
+    //Returns true if the two rectangles overlap
+    this.overlaps = function(x1, y1, w1, h1, x2, y2, w2, h2) {
+        return (x1 < x2 + w2 && x1 + w1 > x2 && y1 < y2 + h2 && y1 + h1 > y2);
+    };
+    //Interacts with an object
+    this.interact = function (obj, bufferX, bufferY) {
+        var c, r, i, item; //obj.x, obj.y = current; goalX, goalY = desired; actualX, actualY = actual
+        var col = Math.floor((obj.x - bufferX) / this.cellSize),
+            row = Math.floor((obj.y - bufferY) / this.cellSize),
+            colEnd = (obj.x + obj.w + bufferX) / this.cellSize,
+            rowEnd = (obj.y + obj.h + bufferY) / this.cellSize;
+        col = col < 0 ? 0 : col;
+        row = row < 0 ? 0 : row;
+        colEnd = colEnd > (this.width / this.cellSize) ? (this.width / this.cellSize) - 1 : colEnd;
+        rowEnd = rowEnd > (this.height / this.cellSize) ? (this.height / this.cellSize) - 1 : rowEnd;
+        for (c = col; c < colEnd; c++) {
+            for (r = row; r < rowEnd; r++) {
+                for(i = 0; i < this.cells[c][r].length; i++) {
+                    item = this.cells[c][r][i];
+                    if(item !== obj && item.dialog) {
+                        if(this.overlaps(obj.x - bufferX, obj.y - bufferY, obj.w, obj.h, item.x, item.y, item.w, item.h) ||
+                            this.overlaps(obj.x + bufferX, obj.y + bufferY, obj.w, obj.h, item.x, item.y, item.w, item.h)) {
+                            item.interact();
+                            return;
+                        }
+                    }
+                }
             }
         }
-        return intersections; //An array containing the arrays of all possible collisions
+
     };
+    //Update the map cells to reflect the change after movement
+    this.update = function(obj, actualX, actualY) {
+        var c, r, index;
+        if(obj.x !== actualX || obj.y !== actualY) {
+            //Remove object from cell(s). Can be turned into removeObject(obj) with some refactoring.
+            for (c = Math.floor(obj.x / this.cellSize); c < (obj.x + obj.w) / this.cellSize; c++) {
+                for (r = Math.floor(obj.y / this.cellSize); r < (obj.y + obj.h) / this.cellSize; r++) {
+                    index = this.cells[c][r].indexOf(obj);
+                    this.cells[c][r].splice(index, 1);
+                }
+            }
+            //Add object to cell(s). Can be replaced with addObject() with some refactoring
+            for (c = Math.floor(actualX / this.cellSize); c < (actualX + obj.w) / this.cellSize; c++) {
+                for (r = Math.floor(actualY / this.cellSize); r < (actualY + obj.h) / this.cellSize; r++) {
+                    index = this.cells[c][r].indexOf(lyle);
+                    this.cells[c][r].push(obj);
+                }
+            }
+        }
+    };
+    //Draws debug information to the screen
     this.debug = function() {
         var x, y;
+        var color = "#FFFF00";
         var gc = gameWindow.context;
-        for(x = 0; x < this.width/this.cellSize; x++) {
+        gc.strokeStyle = color;
+        gc.globalAlpha = 0.7;
+        for(x = 0; x <= this.width/this.cellSize; x++) {
             gc.beginPath();
             gc.moveTo(x*this.cellSize,0);
             gc.lineTo(x*this.cellSize,this.height);
             gc.stroke();
         }
-        for(y = 0; y < this.height/this.cellSize; y++ ) {
+        for(y = 0; y <= this.height/this.cellSize; y++ ) {
             gc.beginPath();
             gc.moveTo(0, y*this.cellSize);
             gc.lineTo(this.width, y*this.cellSize);
             gc.stroke();
         }
-        for(x = 0; x < this.grid.length; x++) {
-            for(y = 0; y < this.grid[x].length; y++) {
-                gc.fillText((this.grid[x][y]).length, (x*this.cellSize)+25, (y*this.cellSize)+25);
+        for(x = 0; x < this.cells.length; x++) {
+            for(y = 0; y < this.cells[x].length; y++) {
+                gc.globalAlpha = 0.7;
+                gc.fillStyle = color;
+                gc.font="16px Consolas";
+                gc.textAlign = "center";
+                gc.fillText((this.cells[x][y]).length, (x*this.cellSize)+(this.cellSize/2), (y*this.cellSize)+(this.cellSize/2));
+                gc.fillStyle = "#DDDDFF";
+                gc.globalAlpha = (this.cells[x][y]).length * 0.1;
+                gc.fillRect(x * this.cellSize, y * this.cellSize, cellSize, cellSize);
             }
         }
+        gc.globalAlpha = 1;
     }
 }
 
-//This stores the SRCs for all portraits. IT'S FUCKING STUPID
-var portrait = {
-    portList : null,
-    img : null,
-    pos : 0,
-    index : 0,
-    tempIndex : 0,
-    x : 31,
-    y : 38,
-    width : 320,
-    height : 416,
-    animateTimer : 700,
-    timerDefault : 700,
-    timerFast : 250,
-    update : function (dt) {
-        if(this.portList[this.index] !== null) {
-            var gc = gameWindow.context;
-            this.animateTimer -= dt; //Decrease timer
-            if (this.animateTimer <= 0) {
-                if(this.img === this.portList[this.index]) {
-                    this.tempIndex += 1;
-                    this.animateTimer = this.timerFast;
-                } else {
-                    this.tempIndex = this.index;
-                    this.animateTimer = this.timerDefault;
-                }
-            }
-
-            if(this.pos === 0) {
-                this.img = this.portList[this.tempIndex];
-                gc.drawImage(this.img, this.x, this.y);
-            } else if (this.pos === 1) {
-                this.img = this.portList[this.tempIndex];
-                gc.scale(-1,1);
-                gc.drawImage(this.img, this.x - 800, this.y, this.width, this.height);
-                gc.setTransform(1,0,0,1,0,0);
-            }
-        }
-    }
-};
-
-/*
- * All actor information is here. It's messy, just like my life
- */
-var lyle = {
-    moveable : true, //Dictates whether the player can move
-    sprites : null,
-    curSprIndex : 0,
-    img : null,
-    width : 48,
-    height : 96,
-    x : 40,
-    y : 100,
-    xo : 24,
-    yo : 96,
-    xSpd : 0.15,
-    ySpd : 0.11,
-    update : function () {
-        this.img = this.sprites[this.curSprIndex];
-        var gc = gameWindow.context;
-        gc.drawImage(this.img, (this.x - this.xo), (this.y - this.yo), this.width, this.height);
-    }
-};
-
-var kiana = {
-    0 : 0, //0 index is used for current dialogue index pointer. Easy access! (hopefully)
-    dialogues : [10, 15, 20], //All the indexes at which they have dialogue for
-    sprites : null,
-    curSprIndex : 0,
-    img : null,
-    width : 48,
-    height: 96,
-    x : 260,
-    y : 399,
-    xo : 24,
-    yo : 96,
-    update : function () {
-        this.img = this.sprites[this.curSprIndex];
-        var gc = gameWindow.context;
-        gc.drawImage(this.img, (this.x - this.xo), (this.y - this.yo), this.width, this.height);
-    }
-};
-
-var jackie = {
-    0 : 0,
-    dialogues : [100, 105],
-    sprites : null,
-    curSprIndex : 0,
-    img : null,
-    width : 64,
-    height: 128,
-    x : 700,
-    y : 200,
-    xo : 32,
-    yo : 128,
-    update : function () {
-        this.img = this.sprites[this.curSprIndex];
-        var gc = gameWindow.context;
-        gc.drawImage(this.img, (this.x - this.xo), (this.y - this.yo), this.width, this.height);
-    }
-};
-
-interactables = [kiana, jackie];
-collidables = [kiana, jackie];
-drawOrder = [jackie, kiana, lyle];
-
-var textbox = {
-    open : false, //Is the textbox open?
+var chatbox = {
+    open : false, //Is the chatbox open?
     typing: false, //Is text being output?
-    //sprSrc : "https://i.imgur.com/ezVjs9g.png",
-    //img : new Image(),
-    img : null,
-    width : 770,
-    height : 130,
     x : 15,
     y : 454,
-    lineWidth : 52, //Max chars for a single line
-    lineHeight : 30, //How many pixels to jump down
-    timerDefault : 35, //Default timer value
-    timerFast : 16, //Quick timer value
-    timerNormal : 35, //Normal timer value
-    textToPrint : "This text should never appear.", // Full text we want to print
-    printedText : "", // Section of the text printed so far
+    lineWidth : 746, //Max line width
+    lineHeight : 28, //How many pixels to jump down after a line
+    timerNormal : 35, //Normal timer value //Normally 35, 100 for testing
     typeTimer : 35, // Timer to know when to print a new letter
-    typePosition : 0, //Type cursor position
-    update : function (dt) {
-        //alert("timedefault: " + this.timerDefault);
-        var gc = gameWindow.context;
-        gc.font="24px Consolas";
+    typeWordPos : 0, //Type cursor position in the current word
+    typeArrayPos : 0, //Type cursor position in the array
+    wordsArray : [], //The array for entire current dialogue
+    printedText : "", // Section of the text printed so far
+    updateWordArray : function (str) {
+        this.wordsArray = str.split(' ');
+    },
+    formatText : function (gc) {
+        var yOffset, metrics, testWidth;
+        yOffset = 0;
+        this.printedText = "";
+        if(this.typeWordPos > this.wordsArray[this.typeArrayPos].length) {
+            if(this.wordsArray[this.typeArrayPos+1]) {
+                this.typeArrayPos++;
+                this.typeWordPos = 0;
+            }
+        }
+        //Print all the text leading up to the current word being printed
+        for(var i = 0; i < this.typeArrayPos; i++) {
+            if(this.wordsArray[i] === "#") {
+                //print the entire word array up to this point with the current offset
+                //reset the words to print to and increase the offset
+                this.drawText(gc, yOffset);
+                yOffset += this.lineHeight;
+                this.printedText = "";
+            } else {
+                //compare printedText after this item
+                metrics = gc.measureText(this.printedText + this.wordsArray[i]);
+                testWidth = metrics.width;
+                if(testWidth > this.lineWidth) {
+                    this.drawText(gc, yOffset);
+                    yOffset += this.lineHeight;
+                    this.printedText = "";
+                }
+                this.printedText += (this.wordsArray[i] + " ")
+            }
+        }
+
+        var wordChunk = (this.wordsArray[this.typeArrayPos]).substring(0,this.typeWordPos);
+        if(wordChunk === "#") {
+            //Auto-advance word position. New line handling is done in for loop
+            this.typeWordPos++;
+        } else {
+            metrics = gc.measureText(this.printedText + wordChunk);
+            testWidth = metrics.width;
+            if(testWidth > this.lineWidth) {
+                this.drawText(gc, yOffset);
+                yOffset += this.lineHeight;
+                this.printedText = "";
+            }
+            this.printedText += wordChunk
+        }
+
+        //check that the current printedText string is not longer than the line width
+        //if it is, cut it, print, increase offset, reset printedwords and repeat until it is less than the width
+        /*metrics = gc.measureText(this.printedText);
+        testWidth = metrics.width;
+        if(testWidth > this.lineWidth) {
+            this.drawText(gc, yOffset);
+            yOffset += this.lineHeight;
+            this.printedText = "";
+        }*/
+
+
+        this.drawText(gc, yOffset);
+    },
+    drawText : function (gc, yOffset) {
+        gc.font="22px Consolas";
         gc.textAlign = "left";
         gc.fillStyle = "#DDDDDD";
-        //this.img.src = this.sprSrc;
+        gc.fillText(this.printedText, this.x + 16, this.y + 30 + yOffset);
+    },
+    update : function (dt) {
         //This horrible mess handles gradually typing text
         if(this.typing) {
             this.typeTimer -= dt; //Decrease timer
-            if (this.printedText.length !== this.textToPrint.length) {
+            //If the current array position has not reached the end of the array, keep typing
+            if (this.typeArrayPos < this.wordsArray.length - 1) {
                 this.typing = true;
             }
+            //If the timer reaches 0, reset it and increment the word position
             if(this.typeTimer <= 0) { //Timer done, we need to print a new letter
-                this.typeTimer = this.timerDefault;
-                this.typePosition++; //Adjust position, use string.sub to get sub-string
-                this.printedText = this.textToPrint.substring(0,this.typePosition);
+                this.typeTimer = this.timerNormal;
+                this.typeWordPos++;
             }
-            else if(this.printedText.length === this.textToPrint.length) {
+            //If the array position is greater than the array length - 1 (0 indexed), we are no longer typing words
+            else if(this.typeArrayPos > this.wordsArray.length - 1) {
                 this.typing = false;
             }
         }
-        //Oh my fucking god javascript why are you like this
-        var sub1;
-        var sub2;
-        var sub3;
-        var sub4;
-        gc.drawImage(this.img, this.x, this.y, this.width, this.height);
-        if(this.printedText.length <= this.lineWidth) {
-            gc.fillText(this.printedText, this.x + 15, this.y + 30);
-        }else if(this.printedText.length > this.lineWidth && this.printedText.length <= (this.lineWidth*2)) {
-            sub1 = this.printedText.substring(0, this.lineWidth);
-            sub2 = this.printedText.substring(this.lineWidth);
-            gc.fillText(sub1, this.x + 15, this.y + 30);
-            gc.fillText(sub2, this.x + 15, this.y + 30 + this.lineHeight);
-        }else if(this.printedText.length > (this.lineWidth*2) && this.printedText.length <= (this.lineWidth*3)) {
-            sub1 = this.printedText.substring(0, this.lineWidth);
-            sub2 = this.printedText.substring(this.lineWidth, this.lineWidth*2);
-            sub3 = this.printedText.substring(this.lineWidth*2);
-            gc.fillText(sub1, this.x + 15, this.y + 30);
-            gc.fillText(sub2, this.x + 15, this.y + 30 + this.lineHeight);
-            gc.fillText(sub3, this.x + 15, this.y + 30 + (this.lineHeight*2));
-        }else if(this.printedText.length > (this.lineWidth*3) && this.printedText.length <= (this.lineWidth*4)) {
-            sub1 = this.printedText.substring(0, this.lineWidth);
-            sub2 = this.printedText.substring(this.lineWidth, this.lineWidth*2);
-            sub3 = this.printedText.substring(this.lineWidth*2, this.lineWidth*3);
-            sub4 = this.printedText.substring(this.lineWidth*3);
-            gc.fillText(sub1, this.x + 15, this.y + 30);
-            gc.fillText(sub2, this.x + 15, this.y + 30 + this.lineHeight);
-            gc.fillText(sub3, this.x + 15, this.y + 30 + (this.lineHeight*2));
-            gc.fillText(sub4, this.x + 15, this.y + 30 + (this.lineHeight*3));
-            //fuck me this bullshit is the worst code ive ever written
-        }else {
-            alert("Asshole, the string's too damn long")
-        }
-
+        //Draw the chatbox and text
+        var gc = gameWindow.context;
+        gc.drawImage(images[0], this.x, this.y);
+        this.formatText(gc);
     }
 };
 
 var gameWindow = {
     canvas : document.createElement("canvas"),
     start : function() {
-        this.canvas.width = 800;
-        this.canvas.height = 600;
+        this.canvas.width = mapWidth;
+        this.canvas.height = mapHeight;
         this.spacePressed = false;
-        drawOrder.sort(compareY);
+
         this.context = this.canvas.getContext("2d");
         document.body.insertBefore(this.canvas, document.body.childNodes[0]);
-        this.interval = setInterval(update, 16.6666666); //50 fps
+        this.interval = setInterval(update, 16.6666666); //60 fps
+
         window.addEventListener('keydown', function (e) { //Listener for key press
             gameWindow.keys = (gameWindow.keys || []);
+            gameWindow.keys[e.keyCode] = true;
             if (e.keyCode === 32 && !gameWindow.spacePressed) { //Space bar code
                 gameWindow.spacePressed = true;
-                if (textbox.open && textbox.typing) {
-                    textbox.printedText = textbox.textToPrint;
-                    textbox.typing = false;
-                } else if (textbox.open && !textbox.typing) {
-                    dialogueLine(++scriptIndex)
-                } else if (!textbox.open && lyle.moveable) {
-                    for (var i = 0; i < interactables.length; i++) {
-                        var o = interactables[i];
-                        if (lyle.x >= o.x-(o.width+4) && lyle.x <= o.x+(o.width+4) && lyle.y <= o.y+(o.height/2) && lyle.y >= o.y-(o.height/2)) {
-                            textbox.open = true;
-                            lyle.moveable = false;
-                            scriptIndex = o.dialogues[o[0]];
-                            if (o.dialogues[o[0]+1]) {
-                                o[0] = o[0] + 1;
-                            }
-                            dialogueLine(scriptIndex);
-                        }
-                    }
+                apartment.interact(lyle, 6, 6);
+            }
+        });
+
+        window.addEventListener('keyup', function (e) { //Listener for key release
+            if(gameWindow.keys) {
+                gameWindow.keys[e.keyCode] = false;
+                if(!gameWindow.keys[32]) {
+                    gameWindow.spacePressed = false;
                 }
             }
-            else { //Do this if it wasn't space or whatever
-                gameWindow.keys[e.keyCode] = true;
-            }
         });
-        window.addEventListener('keyup', function (e) { //Listener for key release
-            gameWindow.keys[e.keyCode] = false;
-            if(gameWindow.keys && !gameWindow.keys[32]) {
-                gameWindow.spacePressed = false;
-            }
-        });
-        
-    },
 
+    },
     clear : function() { // Clear canvas
         this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
     },
@@ -352,107 +352,51 @@ function update() { //Handles both update and draw functions- this is probably a
     lastUpdate = now;
     gameWindow.clear();
 
-    apartment.debug(); //Comment out when not debugging
-
-    for(var i = 0; i < drawOrder.length; i++) {
-        drawOrder[i].update();
-    }
-
-    if(lyle.moveable && gameWindow.keys) {
+    if(lyle.canMove && gameWindow.keys) {
+        var dx = 0, dy = 0;
         if (gameWindow.keys[37]) { //L
-            var blockedL = false;
-            var projMoveL = (lyle.x - (lyle.width/2)) - (lyle.xSpd * dt); //projected left boundary after movement
-            for (var itrL = 0; itrL < collidables.length; itrL++) {
-                var cL = collidables[itrL];
-                if (projMoveL < cL.x + (cL.width/2) && projMoveL > cL.x - (cL.width/2) && lyle.y > cL.y - (cL.height/2) && lyle.y - (lyle.height/2) < cL.y) {
-                    blockedL = true;
-                    lyle.x = cL.x + (cL.width/2) + (lyle.width/2);
-                }
-            }
-            if(!blockedL) {
-                lyle.x = Math.floor(lyle.x - (lyle.xSpd * dt));
-            }
-
+            dx = Math.floor(-lyle.xSpeed * dt);
+            testAnim.pauseAtBeginning();
         }
         if (gameWindow.keys[39]) { //R
-            var blockedR = false;
-            var projMoveR = (lyle.x + (lyle.width/2)) + (lyle.xSpd * dt);
-            for (var itrR = 0; itrR < collidables.length; itrR++) {
-                var cR = collidables[itrR];
-                if (projMoveR > cR.x - (cR.width/2) && projMoveR < cR.x + (cR.width/2) && lyle.y > cR.y - (cR.height/2) && lyle.y - (lyle.height/2) < cR.y) {
-                    blockedR = true;
-                    lyle.x = cR.x - (cR.width/2) - (lyle.width/2);
-                }
-            }
-            if(!blockedR) {
-                lyle.x = Math.ceil(lyle.x + (lyle.xSpd * dt));
-            }
+            dx = Math.ceil(lyle.xSpeed * dt);
+            testAnim.resume();
         }
         if (gameWindow.keys[38]) { //U
-            var blockedU = false;
-            var projMoveU = (lyle.y - (lyle.height/2)) - (lyle.ySpd * dt);
-            for (var itrU = 0; itrU < collidables.length; itrU++) {
-                var cU = collidables[itrU];
-                if (projMoveU > cU.y - (cU.height/2) && projMoveU < cU.y && lyle.x + (lyle.width/2) > cU.x - (cU.width/2) && lyle.x - (lyle.width/2) < cU.x + (cU.width/2)) {
-                    blockedU = true;
-                    lyle.y = cU.y + (lyle.height/2);
-                }
-            }
-            if(!blockedU) {
-                lyle.y = Math.floor(lyle.y - (lyle.ySpd * dt));
-                drawOrder.sort(compareY);
-            }
+            dy = Math.floor(-lyle.xSpeed * dt);
+            testAnim.flip();
         }
         if (gameWindow.keys[40]) { //D
-            var blockedD = false;
-            var projMoveD = lyle.y + (lyle.ySpd * dt);
-            for (var itrD = 0; itrD < collidables.length; itrD++) {
-                var cD = collidables[itrD];
-                if (projMoveD > cD.y - (cD.height/2) && projMoveD < cD.y && lyle.x + (lyle.width/2) > cD.x - (cD.width/2) && lyle.x - (lyle.width/2) < cD.x + (cD.width/2)) {
-                    blockedD = true;
-                    lyle.y = cD.y - (cD.height/2);
-                }
-            }
-            if(!blockedD) {
-                lyle.y = Math.ceil(lyle.y + (lyle.ySpd * dt));
-                drawOrder.sort(compareY);
-            }
+            dy = Math.ceil(lyle.xSpeed * dt);
+        }
+        if(dx !== 0 || dy !== 0) {
+            var movement = apartment.move(lyle, lyle.x + dx, lyle.y + dy);
+            lyle.x = movement[0];
+            lyle.y = movement[1];
         }
     }
 
-    if (textbox.open) {
-        portrait.update(dt);
-        textbox.update(dt);
-    }
+    block1.update();
+    block2.update();
+    lyle.update();
 
+    testAnim.update(dt, 31, 38);
+
+    apartment.debug(); //Comment out when not debugging
 }
 
-function dialogueLine(index) {
-    if (script[index]) {
-        textbox.typing = true;
-        textbox.typePosition = 0;
-        textbox.printedText = "";
-        textbox.textToPrint = script[index][2];
-        portrait.index = script[index][0];
-        portrait.tempIndex = script[index][0];
-        portrait.pos = script[index][1];
-    } else {
-        textbox.open = false;
-        lyle.moveable = true;
+function startGame() {
+    preload(
+        "https://i.imgur.com/seoBUYH.png", // 0: Lyle placeholders
+        "https://i.imgur.com/oQeiIiH.png" // 1: Kiana placeholders
+    );
+    apartment.initializeCells();
+    apartment.addObject(lyle);
+    apartment.addObject(block1);
+    apartment.addObject(block2);
+    testAnim = new Animation(images[1], 0, 1, 320, 384);
+    gameWindow.start();
     }
-}
-
-function compareY(a, b) {
-    if (a.y < b.y) {
-        return -1;
-    }
-    else if (a.y > b.y) {
-        return 1;
-    }
-    else {
-        return 0;
-    }
-}
 
 function preload() {
     for (var i = 0; i < arguments.length; i++) {
@@ -461,16 +405,55 @@ function preload() {
     }
 }
 
-var scriptIndex = 0;
-var script = [];
-script[10] = [1, 0, "Hey, Kiana! We officially have names now!"];
-script[11] = [3, 1, "Holy shit Lyle! This scripting method is horrible."];
-script[12] = [1, 0, "Yeah, it is pretty bad, isn't it?"];
-script[13] = [3, 1, "Whoever made this isn't very good at programming. Ohwell, I guess. We're stuck with him."];
-script[15] = [3, 1, "This is my second set of dialogue. Neat, huh?"];
-script[20] = [3, 1, "And this is my third!"];
-script[21] = [3, 1, "Having multiple dialogues sure is a neat feature,   huh?"];
-script[100] = [5, 1, "I have no personality. Bummer."];
-script[101] = [5, 1, "I'm a single panther, but I'm not looking so you canfuck off."];
-script[102] = [5, 1, "You should fix your scripting skills, bucko."];
-script[105] = [5, 1, "Yo."];
+function Animation(img, startIndex, endIndex, width, height) {
+    this.img = img;
+    this.startIndex = startIndex;
+    this.endIndex = endIndex;
+    this.curIndex = startIndex;
+    this.width = width;
+    this.height = height;
+    this.frameCounter = 0;
+    this.frameTimer = 200;
+    this.animated = true;
+    this.isOriginalOrientation = true;
+
+    this.update = function (dt, x, y) {
+        var gc = gameWindow.context;
+        if(this.isOriginalOrientation) {
+            gc.drawImage(this.img, this.curIndex * this.width, 0, this.width, this.height, x, y, this.width, this.height);
+        } else {
+            gc.scale(-1,1);
+            gc.drawImage(this.img, this.curIndex * this.width, 0, this.width, this.height, x - mapWidth, y, this.width, this.height);
+            gc.setTransform(1,0,0,1,0,0);
+        }
+
+        if(this.animated) {
+            this.incrementCurIndex(dt);
+        }
+
+    };
+    this.incrementCurIndex = function (dt) {
+        if(this.frameCounter > this.frameTimer) {
+            this.frameCounter = 0;
+            if(this.curIndex === this.endIndex) {
+                this.curIndex = this.startIndex;
+            } else {
+                this.curIndex++;
+            }
+        } else {
+            this.frameCounter += dt;
+        }
+
+    };
+    this.resume = function () {
+        this.animated = true;
+    };
+    this.pauseAtBeginning = function () {
+        this.animated = false;
+        this.frameCounter = 0;
+        this.curIndex = startIndex;
+    };
+    this.flip = function () {
+        this.isOriginalOrientation = !this.isOriginalOrientation;
+    }
+}

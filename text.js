@@ -116,17 +116,17 @@ var chatbox = {
         //This horrible mess handles gradually typing text
         if(this.typing) {
             this.typeTimer -= dt; //Decrease timer
+            //If the current array position has not reached the end of the array, keep typing
             if (this.typeArrayPos < this.wordsArray.length - 1) {
-                //console.log(this.typeArrayPos + " < " + this.wordsArray.length + " : Continuing");
                 this.typing = true;
             }
+            //If the timer reaches 0, reset it and increment the word position
             if(this.typeTimer <= 0) { //Timer done, we need to print a new letter
                 this.typeTimer = this.timerNormal;
                 this.typeWordPos++;
-                console.log(this.typeWordPos)
             }
+            //If the array position is greater than the array length - 1 (0 indexed), we are no longer typing words
             else if(this.typeArrayPos > this.wordsArray.length - 1) {
-                //console.log(this.typeArrayPos + " >= " + this.wordsArray.length + " : Stopping");
                 this.typing = false;
             }
         }
