@@ -9,7 +9,7 @@ var testDialogues = {
     curLine : 0,
     pointerReset : 0,
     0 : [
-        [0, 0, "This is a test of the new dialogue system. # This should be on a new line."],
+        [0, 0, "This is a test of the new dialogue system. \n This should be on a new line."],
         [0, 0, "Isn't this neat?"],
         [1, 1, "Yeah, I guess it is."]
     ],
@@ -50,26 +50,9 @@ function Item(x, y, w, h, color, solid, prop, dialogues) {
         gc.fillRect(this.x, this.y, this.w, this.h);
     };
     this.interact = function () {
-        console.log(this.dialogues[this.dialogues.pointer][this.dialogues.curLine]);
-        //This executes when space is pressed
-            //Does the current dialogue being pointed to exist?
-            //If no, display error message
-                //If yes, does the current line of dialogue exist?
-                //If yes, send dialogue to chatbox, advance line pointer by one
-                //If no, send null to chatbox to end dialogue, advance dialogue pointer by one if that dialogue exists and reset line pointer
-        if(this.dialogues[this.dialogues.pointer][this.dialogues.curLine] && this.dialogues[this.dialogues.pointer][this.dialogues.curLine] !== null) {
-            console.log("if");
-            chatbox.nextDialogue(this.dialogues[this.dialogues.pointer][this.dialogues.curLine]);
-            this.dialogues.curLine++;
-        } else {
-            console.log("else");
-            chatbox.nextDialogue(null);
-            this.dialogues.curLine = 0;
-            if(this.dialogues[this.dialogues.pointer+1] && this.dialogues[this.dialogues.pointer+1] !== null) {
-                this.dialogues.pointer++;
-            }
-        }
-    }
+        chatbox.executeDialogue(this);
+    };
+
 }
 
 function Map(cellSize) {
@@ -245,53 +228,63 @@ var chatbox = {
     wordsArray : [], //The array for current dialogue
     printedText : "", // Section of the text printed so far
     dialogueArray : [], //The array for entire dialogue
-    portraitAnimation : null,
-    nextDialogue : function (dialogue) {
-        /*
-        if (textbox.open && textbox.typing) {
-            textbox.printedText = textbox.textToPrint;
-            textbox.typing = false;
-        } else if (textbox.open && !textbox.typing) {
-            dialogueLine(++scriptIndex)
-        } else if (!textbox.open && lyle.moveable) {
-            for (var i = 0; i < interactables.length; i++) {
-                var o = interactables[i];
-                if (lyle.x >= o.x-(o.width+4) && lyle.x <= o.x+(o.width+4) && lyle.y <= o.y+(o.height/2) && lyle.y >= o.y-(o.height/2)) {
-                    textbox.open = true;
-                    lyle.moveable = false;
-                    scriptIndex = o.dialogues[o[0]];
-                    if (o.dialogues[o[0]+1]) {
-                        o[0] = o[0] + 1;
-                    }
-                dialogueLine(scriptIndex);
+    portraitAnimation : null, //The portrait to display for the current dialogue
+    executeDialogue : function (item) {
+        //If the chatbox is not open and lyle can move, open it and stop further movement = ADVANCEMENT
+        //If the chatbox is already open and typing, auto-complete the current line.
+        //Else if the chatbox is open and not typing, go to the next line. = ADVANCEMENT
+            //If the next line does not exist, close the chatbox
+        if((!this.open && lyle.canMove) || (this.open && !this.typing)) {
+            console.log("Advancing dialogue box");
+            if(item.dialogues[item.dialogues.pointer][item.dialogues.curLine] && item.dialogues[item.dialogues.pointer][item.dialogues.curLine] !== null) {
+                console.log("Displaying dialogue");
+                this.nextDialogue(item.dialogues[item.dialogues.pointer][item.dialogues.curLine]);
+                item.dialogues.curLine++;
+            } else {
+                console.log("Ending dialogue");
+                this.nextDialogue(null);
+                item.dialogues.curLine = 0;
+                if(item.dialogues[item.dialogues.pointer+1] && item.dialogues[item.dialogues.pointer+1] !== null) {
+                    item.dialogues.pointer++;
                 }
             }
+        } else if(this.open && this.typing) {
+            console.log("Skipping dialogue");
+            this.typeArrayPos = this.wordsArray.length-1;
+            this.typing = false;
         }
-         */
+    },
+    nextDialogue : function (dialogue) {
         if(dialogue === null) {
             lyle.canMove = true;
             this.open = false;
         } else {
-            lyle.canMove = false;
             this.open = true;
-            this.typing = true
+            this.typing = true;
             this.wordsArray = dialogue[2].split(' ');
+            console.log(this.wordsArray);
+            this.typeArrayPos = 0;
+            this.typeWordPos = 0;
             this.portraitAnimation = animations[dialogue[0]];
         }
+
     },
     formatText : function (gc) {
         var yOffset, metrics, testWidth;
         yOffset = 0;
         this.printedText = "";
         if(this.typeWordPos > this.wordsArray[this.typeArrayPos].length) {
-            if(this.wordsArray[this.typeArrayPos+1]) {
+            this.typeArrayPos++;
+            this.typeWordPos = 0;
+            /*if(this.wordsArray[this.typeArrayPos+1]) {
                 this.typeArrayPos++;
                 this.typeWordPos = 0;
-            }
+            }*/
         }
         //Print all the text leading up to the current word being printed
         for(var i = 0; i < this.typeArrayPos; i++) {
-            if(this.wordsArray[i] === "#") {
+            console.log(i + " < " + this.typeArrayPos);
+            if(this.wordsArray[i] === "\n") {
                 //print the entire word array up to this point with the current offset
                 //reset the words to print to and increase the offset
                 this.drawText(gc, yOffset);
@@ -311,7 +304,7 @@ var chatbox = {
         }
 
         var wordChunk = (this.wordsArray[this.typeArrayPos]).substring(0,this.typeWordPos);
-        if(wordChunk === "#") {
+        if(wordChunk === "\n") {
             //Auto-advance word position. New line handling is done in for loop
             this.typeWordPos++;
         } else {
@@ -324,18 +317,6 @@ var chatbox = {
             }
             this.printedText += wordChunk
         }
-
-        //check that the current printedText string is not longer than the line width
-        //if it is, cut it, print, increase offset, reset printedwords and repeat until it is less than the width
-        /*metrics = gc.measureText(this.printedText);
-        testWidth = metrics.width;
-        if(testWidth > this.lineWidth) {
-            this.drawText(gc, yOffset);
-            yOffset += this.lineHeight;
-            this.printedText = "";
-        }*/
-
-
         this.drawText(gc, yOffset);
     },
     drawText : function (gc, yOffset) {
@@ -345,6 +326,7 @@ var chatbox = {
         gc.fillText(this.printedText, this.x + 16, this.y + 30 + yOffset);
     },
     update : function (dt) {
+        console.log("Is typing? " + this.typing);
         //This horrible mess handles gradually typing text
         if(this.typing) {
             this.typeTimer -= dt; //Decrease timer
@@ -358,7 +340,7 @@ var chatbox = {
                 this.typeWordPos++;
             }
             //If the array position is greater than the array length - 1 (0 indexed), we are no longer typing words
-            else if(this.typeArrayPos > this.wordsArray.length - 1) {
+            else if(this.typeArrayPos >= this.wordsArray.length - 1) {
                 this.typing = false;
             }
         }
