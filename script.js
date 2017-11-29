@@ -4,10 +4,22 @@ var images = [];
 var animations = [];
 var lastUpdate = Date.now();
 
+var testTrigger = {
+    flag : false,
+    run : function () {
+        console.log("running trigger");
+        if(!this.flag) {
+            this.flag = true;
+            testDialogues.pointerReset = testDialogues.pointer;
+            testDialogues.pointer = 10;
+        }
+    }
+};
+
 var testDialogues = {
     pointer : 0,
     curLine : 0,
-    pointerReset : 0,
+    pointerReset : null,
     0 : [
         [0, 0, "This is a test of the new dialogue system. \n This should be on a new line. \n"],
         [0, 0, "Isn't this neat? \n"],
@@ -19,13 +31,23 @@ var testDialogues = {
         [1, 1, "Yeah, I get that. \n"],
         [1, 1, "So when will it be finished do you think? \n Next month? \n 2018? \n"],
         [0, 0, "I don't want to think about that... \n"]
+    ],
+    10 : [
+        [1, 1, "I saw you examine that object! Don't think I didn't! \n"],
+        [0, 0, "Yikes, sorry. \n"],
+        [1, 1, "lol its k \n"]
     ]
 };
 
 var apartment = new Map(100);
-var block1 = new Item(200, 180, 366, 359);
-var block2 = new Item(399, 60, 120, 400, "#EE22AA");
+var block1 = new Item(200, 180, 366, 359, undefined, true);
+var block2 = new Item(399, 60, 120, 400, "#EE22AA", false, true, null, testTrigger);
+console.log(block2.solid);
 var block3 = new Item(80, 350, 32, 32, "#996666", true, true, testDialogues);
+
+var maps = [apartment];
+var curMap = 0;
+
 var lyle = {
     canMove : true,
     x : 53,
@@ -41,15 +63,175 @@ var lyle = {
     }
 };
 
-function Item(x, y, w, h, color, solid, prop, dialogues) {
+var chatbox = {
+    open : false, //Is the chatbox open?
+    typing: false, //Is text being output?
+    x : 15,
+    y : 454,
+    lineWidth : 746, //Max line width
+    lineHeight : 28, //How many pixels to jump down after a line
+    timerNormal : 35, //Normal timer value
+    typeTimer : 35, // Timer to know when to print a new letter
+    typeWordPos : 0, //Type cursor position in the current word
+    typeArrayPos : 0, //Type cursor position in the array
+    wordsArray : [], //The array for current dialogue
+    printedText : "", // Section of the text printed so far
+    dialogueArray : [], //The array for entire dialogue
+    portraitAnimation : null, //The portrait to display for the current dialogue
+    executeDialogue : function (dialogues) {
+        //If the chatbox is not open and lyle can move, open it and stop further movement = ADVANCEMENT
+        //If the chatbox is already open and typing, auto-complete the current line.
+        //Else if the chatbox is open and not typing, go to the next line. = ADVANCEMENT
+        //If the next line does not exist, close the chatbox
+        if(dialogues !== null) {
+            if((!this.open && lyle.canMove) || (this.open && !this.typing)) {
+                if(dialogues[dialogues.pointer][dialogues.curLine] && dialogues[dialogues.pointer][dialogues.curLine] !== null) {
+                    //Advancing dialogue
+                    this.nextDialogue(dialogues[dialogues.pointer][dialogues.curLine]);
+                    dialogues.curLine++;
+                } else {
+                    //Ending dialogue
+                    this.nextDialogue(null);
+                    dialogues.curLine = 0;
+                    if(dialogues.pointerReset !== null) {
+                        dialogues.pointer = dialogues.pointerReset;
+                        dialogues.pointerReset = null;
+                    } else if(dialogues[dialogues.pointer+1] && dialogues[dialogues.pointer+1] !== null) {
+                        dialogues.pointer++;
+                    }
+                }
+            } else if(this.open && this.typing) {
+                //Skipping dialogue
+                this.typeArrayPos = this.wordsArray.length-1;
+                this.typing = false;
+                if(this.portraitAnimation !== null) {
+                    this.portraitAnimation.pauseAtBeginning();
+                }
+            }
+        }
+    },
+    nextDialogue : function (dialogue) {
+        if(dialogue === null) {
+            lyle.canMove = true;
+            this.open = false;
+        } else {
+            lyle.canMove = false;
+            this.open = true;
+            this.typing = true;
+            this.wordsArray = dialogue[2].split(' ');
+            //console.log(this.wordsArray);
+            this.typeArrayPos = 0;
+            this.typeWordPos = 0;
+            if(this.portraitAnimation !== null && !this.portraitAnimation.isOriginalOrientation) {
+                this.portraitAnimation.flip();
+                console.log("Resetting flip")
+            }
+            this.portraitAnimation = animations[dialogue[0]];
+            if(this.portraitAnimation !== null) {
+                if(dialogue[1] === 1) {
+                    console.log("Flipping character portrait");
+                    this.portraitAnimation.flip();
+                }
+                this.portraitAnimation.resume();
+            }
+        }
+
+    },
+    formatText : function (gc) {
+        var yOffset, metrics, testWidth;
+        yOffset = 0;
+        this.printedText = "";
+        if(this.typeWordPos > this.wordsArray[this.typeArrayPos].length) {
+            if(this.wordsArray[this.typeArrayPos+1]) {
+                this.typeArrayPos++;
+                this.typeWordPos = 0;
+            }
+        }
+        //Print all the text leading up to the current word being printed
+        for(var i = 0; i < this.typeArrayPos; i++) {
+            if(this.wordsArray[i] === "\n") {
+                //print the entire word array up to this point with the current offset
+                //reset the words to print and increase the offset
+                this.drawText(gc, yOffset);
+                yOffset += this.lineHeight;
+                this.printedText = "";
+            } else {
+                //compare printedText after this item
+                metrics = gc.measureText(this.printedText + this.wordsArray[i]);
+                testWidth = metrics.width;
+                if(testWidth > this.lineWidth) {
+                    this.drawText(gc, yOffset);
+                    yOffset += this.lineHeight;
+                    this.printedText = "";
+                }
+                this.printedText += (this.wordsArray[i] + " ")
+            }
+        }
+
+        var wordChunk = (this.wordsArray[this.typeArrayPos]).substring(0,this.typeWordPos);
+        if(wordChunk === "\n") {
+            //Auto-advance word position. New line handling is done in for loop
+            this.typeWordPos++;
+        } else {
+            metrics = gc.measureText(this.printedText + wordChunk);
+            testWidth = metrics.width;
+            if(testWidth > this.lineWidth) {
+                this.drawText(gc, yOffset);
+                yOffset += this.lineHeight;
+                this.printedText = "";
+            }
+            this.printedText += wordChunk
+        }
+        this.drawText(gc, yOffset);
+    },
+    drawText : function (gc, yOffset) {
+        gc.font="22px Consolas";
+        gc.textAlign = "left";
+        gc.fillStyle = "#DDDDDD";
+        gc.fillText(this.printedText, this.x + 16, this.y + 30 + yOffset);
+    },
+    update : function (dt) {
+        //console.log("Is typing? " + this.typing);
+        //This horrible mess handles gradually typing text
+        if(this.typing) {
+            this.typeTimer -= dt; //Decrease timer
+            //If the current array position has not reached the end of the array, keep typing
+            if (this.typeArrayPos < this.wordsArray.length - 1) {
+                this.typing = true;
+            }
+            //If the timer reaches 0, reset it and increment the word position
+            if(this.typeTimer <= 0) { //Timer done, we need to print a new letter
+                this.typeTimer = this.timerNormal;
+                this.typeWordPos++;
+            }
+            //If the array position is greater than the array length - 1 (0 indexed), we are no longer typing words
+            else if(this.typeArrayPos >= this.wordsArray.length - 1) {
+                if(this.portraitAnimation !== null) {
+                    this.portraitAnimation.pauseAtBeginning();
+                }
+                this.typing = false;
+            }
+        }
+        //Draw the chatbox and text
+        var gc = gameWindow.context;
+        if(this.portraitAnimation !== null) {
+            this.portraitAnimation.update(dt, 30, 70)
+        }
+        gc.drawImage(images[0], this.x, this.y);
+        this.formatText(gc);
+    }
+};
+
+function Item(x, y, w, h, color, solid, prop, dialogues, trigger) {
     this.x = x;
     this.y = y;
     this.w = w;
     this.h = h;
     this.color = color || "#7799EE";
-    this.solid = solid || true;
+    this.solid = solid || false;
     this.prop = prop || false;
     this.dialogues = dialogues || null;
+    this.trigger = trigger || null;
     this.update = function () {
         var gc = gameWindow.context;
         gc.fillStyle = this.color;
@@ -57,6 +239,9 @@ function Item(x, y, w, h, color, solid, prop, dialogues) {
     };
     this.interact = function () {
         chatbox.executeDialogue(this.dialogues);
+        if(this.trigger !== null) {
+            trigger.run();
+        }
     };
 
 }
@@ -84,6 +269,7 @@ function Map(cellSize) {
             for (r = Math.floor(obj.y / this.cellSize); r < (obj.y + obj.h) / this.cellSize; r++) {
                 this.cells[c][r].push(obj);
                 this.globalItems.push(obj);
+                this.updateDrawOrder();
             }
         }
     };
@@ -245,160 +431,6 @@ function Map(cellSize) {
     }
 }
 
-var chatbox = {
-    open : false, //Is the chatbox open?
-    typing: false, //Is text being output?
-    x : 15,
-    y : 454,
-    lineWidth : 746, //Max line width
-    lineHeight : 28, //How many pixels to jump down after a line
-    timerNormal : 35, //Normal timer value
-    typeTimer : 35, // Timer to know when to print a new letter
-    typeWordPos : 0, //Type cursor position in the current word
-    typeArrayPos : 0, //Type cursor position in the array
-    wordsArray : [], //The array for current dialogue
-    printedText : "", // Section of the text printed so far
-    dialogueArray : [], //The array for entire dialogue
-    portraitAnimation : null, //The portrait to display for the current dialogue
-    executeDialogue : function (dialogues) {
-        //If the chatbox is not open and lyle can move, open it and stop further movement = ADVANCEMENT
-        //If the chatbox is already open and typing, auto-complete the current line.
-        //Else if the chatbox is open and not typing, go to the next line. = ADVANCEMENT
-            //If the next line does not exist, close the chatbox
-        if((!this.open && lyle.canMove) || (this.open && !this.typing)) {
-            if(dialogues[dialogues.pointer][dialogues.curLine] && dialogues[dialogues.pointer][dialogues.curLine] !== null) {
-                //Advancing dialogue
-                this.nextDialogue(dialogues[dialogues.pointer][dialogues.curLine]);
-                dialogues.curLine++;
-            } else {
-                //Ending dialogue
-                this.nextDialogue(null);
-                dialogues.curLine = 0;
-                if(dialogues[dialogues.pointer+1] && dialogues[dialogues.pointer+1] !== null) {
-                    dialogues.pointer++;
-                }
-            }
-        } else if(this.open && this.typing) {
-            //Skipping dialogue
-            this.typeArrayPos = this.wordsArray.length-1;
-            this.typing = false;
-            if(this.portraitAnimation !== null) {
-                this.portraitAnimation.pauseAtBeginning();
-            }
-        }
-    },
-    nextDialogue : function (dialogue) {
-        if(dialogue === null) {
-            lyle.canMove = true;
-            this.open = false;
-        } else {
-            lyle.canMove = false;
-            this.open = true;
-            this.typing = true;
-            this.wordsArray = dialogue[2].split(' ');
-            //console.log(this.wordsArray);
-            this.typeArrayPos = 0;
-            this.typeWordPos = 0;
-            if(this.portraitAnimation !== null && !this.portraitAnimation.isOriginalOrientation) {
-                this.portraitAnimation.flip();
-                console.log("Resetting flip")
-            }
-            this.portraitAnimation = animations[dialogue[0]];
-            if(this.portraitAnimation !== null) {
-                if(dialogue[1] === 1) {
-                    console.log("Flipping character portrait");
-                    this.portraitAnimation.flip();
-                }
-                this.portraitAnimation.resume();
-            }
-        }
-
-    },
-    formatText : function (gc) {
-        var yOffset, metrics, testWidth;
-        yOffset = 0;
-        this.printedText = "";
-        if(this.typeWordPos > this.wordsArray[this.typeArrayPos].length) {
-            if(this.wordsArray[this.typeArrayPos+1]) {
-                this.typeArrayPos++;
-                this.typeWordPos = 0;
-            }
-        }
-        //Print all the text leading up to the current word being printed
-        for(var i = 0; i < this.typeArrayPos; i++) {
-            if(this.wordsArray[i] === "\n") {
-                //print the entire word array up to this point with the current offset
-                //reset the words to print and increase the offset
-                this.drawText(gc, yOffset);
-                yOffset += this.lineHeight;
-                this.printedText = "";
-            } else {
-                //compare printedText after this item
-                metrics = gc.measureText(this.printedText + this.wordsArray[i]);
-                testWidth = metrics.width;
-                if(testWidth > this.lineWidth) {
-                    this.drawText(gc, yOffset);
-                    yOffset += this.lineHeight;
-                    this.printedText = "";
-                }
-                this.printedText += (this.wordsArray[i] + " ")
-            }
-        }
-
-        var wordChunk = (this.wordsArray[this.typeArrayPos]).substring(0,this.typeWordPos);
-        if(wordChunk === "\n") {
-            //Auto-advance word position. New line handling is done in for loop
-            this.typeWordPos++;
-        } else {
-            metrics = gc.measureText(this.printedText + wordChunk);
-            testWidth = metrics.width;
-            if(testWidth > this.lineWidth) {
-                this.drawText(gc, yOffset);
-                yOffset += this.lineHeight;
-                this.printedText = "";
-            }
-            this.printedText += wordChunk
-        }
-        this.drawText(gc, yOffset);
-    },
-    drawText : function (gc, yOffset) {
-        gc.font="22px Consolas";
-        gc.textAlign = "left";
-        gc.fillStyle = "#DDDDDD";
-        gc.fillText(this.printedText, this.x + 16, this.y + 30 + yOffset);
-    },
-    update : function (dt) {
-        //console.log("Is typing? " + this.typing);
-        //This horrible mess handles gradually typing text
-        if(this.typing) {
-            this.typeTimer -= dt; //Decrease timer
-            //If the current array position has not reached the end of the array, keep typing
-            if (this.typeArrayPos < this.wordsArray.length - 1) {
-                this.typing = true;
-            }
-            //If the timer reaches 0, reset it and increment the word position
-            if(this.typeTimer <= 0) { //Timer done, we need to print a new letter
-                this.typeTimer = this.timerNormal;
-                this.typeWordPos++;
-            }
-            //If the array position is greater than the array length - 1 (0 indexed), we are no longer typing words
-            else if(this.typeArrayPos >= this.wordsArray.length - 1) {
-                if(this.portraitAnimation !== null) {
-                    this.portraitAnimation.pauseAtBeginning();
-                }
-                this.typing = false;
-            }
-        }
-        //Draw the chatbox and text
-        var gc = gameWindow.context;
-        if(this.portraitAnimation !== null) {
-            this.portraitAnimation.update(dt, 30, 70)
-        }
-        gc.drawImage(images[0], this.x, this.y);
-        this.formatText(gc);
-    }
-};
-
 function Animation(img, startIndex, endIndex, row, width, height) {
     this.img = img;
     this.startIndex = startIndex;
@@ -519,12 +551,8 @@ function update() { //Handles both update and draw functions- this is probably a
         }
     }
 
-    //block1.update();
-    //block2.update();
-    //block3.update();
-    //lyle.update();
-    apartment.update();
-    apartment.debug(); //Comment out when not debugging
+    maps[curMap].update();
+    maps[curMap].debug(); //Comment out when not debugging
 
     if (chatbox.open) {
         chatbox.update(dt);
