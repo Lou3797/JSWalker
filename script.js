@@ -66,6 +66,7 @@ function Map(cellSize) {
     this.width = mapWidth;
     this.height = mapHeight;
     this.cells = [];
+    this.globalItems = []; //list of Item objects
     //Call this before using a map. Creates the needed number of cells based on cell size
     this.initializeCells = function() {
         var c, r;
@@ -82,6 +83,7 @@ function Map(cellSize) {
         for (c = Math.floor(obj.x / this.cellSize); c < (obj.x + obj.w) / this.cellSize; c++) {
             for (r = Math.floor(obj.y / this.cellSize); r < (obj.y + obj.h) / this.cellSize; r++) {
                 this.cells[c][r].push(obj);
+                this.globalItems.push(obj);
             }
         }
     };
@@ -90,7 +92,8 @@ function Map(cellSize) {
         var movement = this.check(obj, goalX, goalY);
         var actualX = movement[0],
             actualY = movement[1];
-        this.update(obj, actualX, actualY);
+        this.updateCells(obj, actualX, actualY);
+        this.updateDrawOrder();
         return [actualX, actualY];
     };
     //Prevents the object from being out of bounds
@@ -166,7 +169,7 @@ function Map(cellSize) {
 
     };
     //Update the map cells to reflect the change after movement
-    this.update = function(obj, actualX, actualY) {
+    this.updateCells = function(obj, actualX, actualY) {
         var c, r, index;
         if(obj.x !== actualX || obj.y !== actualY) {
             //Remove object from cell(s). Can be turned into removeObject(obj) with some refactoring.
@@ -183,6 +186,28 @@ function Map(cellSize) {
                     this.cells[c][r].push(obj);
                 }
             }
+        }
+    };
+    //Calls .update() on all contained items
+    this.update = function () {
+        for(var i = 0; i < this.globalItems.length; i++) {
+            this.globalItems[i].update();
+        }
+    };
+    //Updates draw order based on y position of all objects
+    this.updateDrawOrder = function () {
+        this.globalItems.sort(this.compareY);
+    };
+    //Sort function for comparing items based on y value
+    this.compareY = function (a, b) {
+        if (a.y < b.y) {
+            return -1;
+        }
+        else if (a.y > b.y) {
+            return 1;
+        }
+        else {
+            return 0;
         }
     };
     //Draws debug information to the screen
@@ -241,19 +266,12 @@ var chatbox = {
         //Else if the chatbox is open and not typing, go to the next line. = ADVANCEMENT
             //If the next line does not exist, close the chatbox
         if((!this.open && lyle.canMove) || (this.open && !this.typing)) {
-            //console.log("Displaying dialogue box");
             if(dialogues[dialogues.pointer][dialogues.curLine] && dialogues[dialogues.pointer][dialogues.curLine] !== null) {
-                console.log("Advancing dialogue");
-
-                if(dialogues[dialogues.pointer][dialogues.curLine][1] === 1 && this.portraitAnimation !== null) {
-                    //this.portraitAnimation.flip();
-                    //console.log("Flipping character portrait")
-                }
-
+                //Advancing dialogue
                 this.nextDialogue(dialogues[dialogues.pointer][dialogues.curLine]);
                 dialogues.curLine++;
             } else {
-                console.log("Ending dialogue");
+                //Ending dialogue
                 this.nextDialogue(null);
                 dialogues.curLine = 0;
                 if(dialogues[dialogues.pointer+1] && dialogues[dialogues.pointer+1] !== null) {
@@ -261,7 +279,7 @@ var chatbox = {
                 }
             }
         } else if(this.open && this.typing) {
-            console.log("Skipping dialogue");
+            //Skipping dialogue
             this.typeArrayPos = this.wordsArray.length-1;
             this.typing = false;
             if(this.portraitAnimation !== null) {
@@ -430,10 +448,10 @@ function Animation(img, startIndex, endIndex, row, width, height) {
     };
     this.flip = function () {
         this.isOriginalOrientation = !this.isOriginalOrientation;
-    }
+    };
     this.getIsOriginalOrientation = function () {
         return this.isOriginalOrientation;
-    }
+    };
 }
 
 var gameWindow = {
@@ -501,11 +519,11 @@ function update() { //Handles both update and draw functions- this is probably a
         }
     }
 
-    block1.update();
-    block2.update();
-    block3.update();
-    lyle.update();
-
+    //block1.update();
+    //block2.update();
+    //block3.update();
+    //lyle.update();
+    apartment.update();
     apartment.debug(); //Comment out when not debugging
 
     if (chatbox.open) {
