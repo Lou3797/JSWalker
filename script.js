@@ -4,18 +4,6 @@ var images = [];
 var animations = [];
 var lastUpdate = Date.now();
 
-var testTrigger = {
-    flag : false,
-    run : function () {
-        console.log("running trigger");
-        if(!this.flag) {
-            this.flag = true;
-            testDialogues.pointerReset = testDialogues.pointer;
-            testDialogues.pointer = 10;
-        }
-    }
-};
-
 var testDialogues = {
     pointer : 0,
     curLine : 0,
@@ -38,11 +26,11 @@ var testDialogues = {
         [1, 1, "lol its k \n"]
     ]
 };
+var testTrigger = new Trigger(testDialogues, 10);
 
 var apartment = new Map(100);
 var block1 = new Item(200, 180, 366, 359, undefined, true);
 var block2 = new Item(399, 60, 120, 400, "#EE22AA", false, true, null, testTrigger);
-console.log(block2.solid);
 var block3 = new Item(80, 350, 32, 32, "#996666", true, true, testDialogues);
 
 var maps = [apartment];
@@ -60,6 +48,44 @@ var lyle = {
         var gc = gameWindow.context;
         gc.fillStyle = "#EE9977";
         gc.fillRect(this.x, this.y, this.w, this.h);
+    }
+};
+
+var gameWindow = {
+    canvas : document.createElement("canvas"),
+    start : function() {
+        this.canvas.width = mapWidth;
+        this.canvas.height = mapHeight;
+        this.spacePressed = false;
+
+        this.context = this.canvas.getContext("2d");
+        document.body.insertBefore(this.canvas, document.body.childNodes[0]);
+        this.interval = setInterval(update, 16.6666666); //60 fps
+
+        window.addEventListener('keydown', function (e) { //Listener for key press
+            gameWindow.keys = (gameWindow.keys || []);
+            gameWindow.keys[e.keyCode] = true;
+            if (e.keyCode === 32 && !gameWindow.spacePressed) { //Space bar code
+                gameWindow.spacePressed = true;
+                apartment.interact(lyle, 6, 6);
+            }
+        });
+
+        window.addEventListener('keyup', function (e) { //Listener for key release
+            if(gameWindow.keys) {
+                gameWindow.keys[e.keyCode] = false;
+                if(!gameWindow.keys[32]) {
+                    gameWindow.spacePressed = false;
+                }
+            }
+        });
+
+    },
+    clear : function() { // Clear canvas
+        this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    },
+    stop : function() { //Stop updating canvas
+        clearInterval(this.interval);
     }
 };
 
@@ -481,48 +507,20 @@ function Animation(img, startIndex, endIndex, row, width, height) {
     this.flip = function () {
         this.isOriginalOrientation = !this.isOriginalOrientation;
     };
-    this.getIsOriginalOrientation = function () {
-        return this.isOriginalOrientation;
-    };
 }
 
-var gameWindow = {
-    canvas : document.createElement("canvas"),
-    start : function() {
-        this.canvas.width = mapWidth;
-        this.canvas.height = mapHeight;
-        this.spacePressed = false;
-
-        this.context = this.canvas.getContext("2d");
-        document.body.insertBefore(this.canvas, document.body.childNodes[0]);
-        this.interval = setInterval(update, 16.6666666); //60 fps
-
-        window.addEventListener('keydown', function (e) { //Listener for key press
-            gameWindow.keys = (gameWindow.keys || []);
-            gameWindow.keys[e.keyCode] = true;
-            if (e.keyCode === 32 && !gameWindow.spacePressed) { //Space bar code
-                gameWindow.spacePressed = true;
-                apartment.interact(lyle, 6, 6);
-            }
-        });
-
-        window.addEventListener('keyup', function (e) { //Listener for key release
-            if(gameWindow.keys) {
-                gameWindow.keys[e.keyCode] = false;
-                if(!gameWindow.keys[32]) {
-                    gameWindow.spacePressed = false;
-                }
-            }
-        });
-
-    },
-    clear : function() { // Clear canvas
-        this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    },
-    stop : function() { //Stop updating canvas
-        clearInterval(this.interval);
+function Trigger(parent, id) {
+    this.flag = false;
+    this.parent = parent; //The dialogues to reference
+    this.id = id; //The dialogue id to skip to
+    this.run = function () {
+        if(!this.flag) {
+            this.flag = true;
+            this.parent.pointerReset = this.parent.pointer;
+            this.parent.pointer = this.id;
+        }
     }
-};
+}
 
 function update() { //Handles both update and draw functions- this is probably a no no
     var now = Date.now();
