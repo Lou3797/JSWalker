@@ -9,21 +9,21 @@ var testDialogues = {
     curLine : 0,
     pointerReset : null,
     0 : [
-        [0, 0, "This is a test of the new dialogue system. \n This should be on a new line. \n"],
-        [0, 0, "Isn't this neat? \n"],
-        [1, 1, "Yeah, I guess it is. \n"]
+        [2, 0, "This is a test of the new dialogue system. \n This should be on a new line."],
+        [2, 0, "Isn't this neat?"],
+        [2, 1, "Yeah, I guess it is."]
     ],
     1 : [
-        [1, 1, "Back for more? \n"],
-        [0, 0, "I just really want to make sure that this all works, y'know? \n"],
-        [1, 1, "Yeah, I get that. \n"],
-        [1, 1, "So when will it be finished do you think? \n Next month? \n 2018? \n"],
-        [0, 0, "I don't want to think about that... \n"]
+        [1, 1, "Back for more?"],
+        [0, 0, "I just really want to make sure that this all works, y'know?"],
+        [1, 1, "Yeah, I get that."],
+        [1, 1, "So when will it be finished do you think? \n Next month? \n 2018?"],
+        [0, 0, "I don't want to think about that..."]
     ],
     10 : [
-        [1, 1, "I saw you examine that object! Don't think I didn't! \n"],
-        [0, 0, "Yikes, sorry. \n"],
-        [1, 1, "lol its k \n"]
+        [1, 1, "I saw you examine that object! Don't think I didn't!"],
+        [0, 0, "Yikes, sorry."],
+        [1, 1, "lol its k"]
     ]
 };
 var testTrigger = new Trigger(testDialogues, 10);
@@ -144,6 +144,7 @@ var chatbox = {
             lyle.canMove = false;
             this.open = true;
             this.typing = true;
+            dialogue[2] += " \n";
             this.wordsArray = dialogue[2].split(' ');
             //console.log(this.wordsArray);
             this.typeArrayPos = 0;
@@ -241,7 +242,7 @@ var chatbox = {
         //Draw the chatbox and text
         var gc = gameWindow.context;
         if(this.portraitAnimation !== null) {
-            this.portraitAnimation.update(dt, 30, 70)
+            this.portraitAnimation.update(dt, this.x, 38);
         }
         gc.drawImage(images[0], this.x, this.y);
         this.formatText(gc);
@@ -561,7 +562,8 @@ function startGame() {
     preload(
         "https://i.imgur.com/ezVjs9g.png", // 00 : Textbox
         "https://i.imgur.com/seoBUYH.png", // 01 : Lyle portrait placeholders
-        "https://i.imgur.com/oQeiIiH.png"  // 02 : Kiana portrait placeholders
+        "https://i.imgur.com/oQeiIiH.png", // 02 : Kiana portrait placeholders
+        "https://i.imgur.com/sOPIFBE.png"  // 03 : Test height
     );
     loadAnimations();
     apartment.initializeCells();
@@ -582,4 +584,9 @@ function preload() {
 function loadAnimations() {
     animations[0] = new Animation(images[1], 0, 1, 0, 320, 384); // 00 : Lyle placeholder ports
     animations[1] = new Animation(images[2], 0, 1, 0, 320, 384); // 01 : Kiana placeholder ports
+    animations[2] = new Animation(images[3], 0, 0, 0, 384, 416); // 02 : Test
+}
+
+function transitionMaps(newMap, newX, newY) {
+
 }
