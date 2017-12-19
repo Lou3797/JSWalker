@@ -21,19 +21,23 @@ var testDialogues = {
         [0, 0, "I don't want to think about that..."]
     ],
     10 : [
-        [1, 1, "I saw you examine that object! Don't think I didn't!"],
-        [0, 0, "Yikes, sorry."],
-        [1, 1, "lol its k"]
+        [null, 1, "This dialogue should have no portrait."]
     ]
 };
-var testTrigger = new Trigger(testDialogues, 10);
+var testTrigger = new DialogueTrigger(testDialogues, 10);
+var testTrans1 = new TransitionTrigger(1, 20, 100);
+var testTrans0 = new TransitionTrigger(0, 50, 50);
 
+var kitchen = new Map(100);
 var apartment = new Map(100);
-var block1 = new Item(200, 180, 366, 359, undefined, true);
+var block1 = new Item(200, 180, 366, 359, undefined, false);
 var block2 = new Item(399, 60, 120, 400, "#EE22AA", false, true, null, testTrigger);
-var block3 = new Item(80, 350, 32, 32, "#996666", true, true, testDialogues);
+var block3 = new Item(80, 350, 32, 32, "#996666", false, true, testDialogues);
+var block4 = new Item(100, 10, 40, 40, "#5d5d5d", false, true, null, testTrans1);
+var block5 = new Item(200, 400, 50, 50, "#5d5d5d", false, true, null, testTrans0);
+var block6 = new Item(600, 400, 100, 100, "#999333", true);
 
-var maps = [apartment];
+var maps = [apartment, kitchen];
 var curMap = 0;
 
 var lyle = {
@@ -67,7 +71,7 @@ var gameWindow = {
             gameWindow.keys[e.keyCode] = true;
             if (e.keyCode === 32 && !gameWindow.spacePressed) { //Space bar code
                 gameWindow.spacePressed = true;
-                apartment.interact(lyle, 6, 6);
+                maps[curMap].interact(lyle, 6, 6);
             }
         });
 
@@ -109,7 +113,7 @@ var chatbox = {
         //If the chatbox is already open and typing, auto-complete the current line.
         //Else if the chatbox is open and not typing, go to the next line. = ADVANCEMENT
         //If the next line does not exist, close the chatbox
-        if(dialogues !== null) {
+        if(dialogues !== null && dialogues !== undefined) {
             if((!this.open && lyle.canMove) || (this.open && !this.typing)) {
                 if(dialogues[dialogues.pointer][dialogues.curLine] && dialogues[dialogues.pointer][dialogues.curLine] !== null) {
                     //Advancing dialogue
@@ -130,7 +134,7 @@ var chatbox = {
                 //Skipping dialogue
                 this.typeArrayPos = this.wordsArray.length-1;
                 this.typing = false;
-                if(this.portraitAnimation !== null) {
+                if(this.portraitAnimation !== null && this.portraitAnimation !== undefined) {
                     this.portraitAnimation.pauseAtBeginning();
                 }
             }
@@ -149,14 +153,14 @@ var chatbox = {
             //console.log(this.wordsArray);
             this.typeArrayPos = 0;
             this.typeWordPos = 0;
-            if(this.portraitAnimation !== null && !this.portraitAnimation.isOriginalOrientation) {
+            if(this.portraitAnimation !== null && this.portraitAnimation !== undefined && !this.portraitAnimation.isOriginalOrientation) {
                 this.portraitAnimation.flip();
-                console.log("Resetting flip")
+                //console.log("Resetting flip")
             }
             this.portraitAnimation = animations[dialogue[0]];
-            if(this.portraitAnimation !== null) {
+            if(this.portraitAnimation !== null && this.portraitAnimation !== undefined) {
                 if(dialogue[1] === 1) {
-                    console.log("Flipping character portrait");
+                    //console.log("Flipping character portrait");
                     this.portraitAnimation.flip();
                 }
                 this.portraitAnimation.resume();
@@ -233,7 +237,7 @@ var chatbox = {
             }
             //If the array position is greater than the array length - 1 (0 indexed), we are no longer typing words
             else if(this.typeArrayPos >= this.wordsArray.length - 1) {
-                if(this.portraitAnimation !== null) {
+                if(this.portraitAnimation !== null && this.portraitAnimation !== null) {
                     this.portraitAnimation.pauseAtBeginning();
                 }
                 this.typing = false;
@@ -241,7 +245,7 @@ var chatbox = {
         }
         //Draw the chatbox and text
         var gc = gameWindow.context;
-        if(this.portraitAnimation !== null) {
+        if(this.portraitAnimation !== null && this.portraitAnimation !== undefined) {
             this.portraitAnimation.update(dt, this.x, 38);
         }
         gc.drawImage(images[0], this.x, this.y);
@@ -250,13 +254,13 @@ var chatbox = {
 };
 
 function Item(x, y, w, h, color, solid, prop, dialogues, trigger) {
-    this.x = x;
-    this.y = y;
-    this.w = w;
-    this.h = h;
-    this.color = color || "#7799EE";
-    this.solid = solid || false;
-    this.prop = prop || false;
+    this.x = x; //X position
+    this.y = y; //Y position
+    this.w = w; //Width
+    this.h = h; //Height
+    this.color = color || "#7799EE"; //Draw color. To be removed
+    this.solid = solid || false; //Can the player move through the object?
+    this.prop = prop || false; //Can the player interact with it?
     this.dialogues = dialogues || null;
     this.trigger = trigger || null;
     this.update = function () {
@@ -266,7 +270,7 @@ function Item(x, y, w, h, color, solid, prop, dialogues, trigger) {
     };
     this.interact = function () {
         chatbox.executeDialogue(this.dialogues);
-        if(this.trigger !== null) {
+        if(this.trigger !== null && this.trigger !== undefined) {
             trigger.run();
         }
     };
@@ -274,11 +278,12 @@ function Item(x, y, w, h, color, solid, prop, dialogues, trigger) {
 }
 
 function Map(cellSize) {
-    this.cellSize = cellSize;
-    this.width = mapWidth;
-    this.height = mapHeight;
-    this.cells = [];
+    this.cellSize = cellSize; //Width & height for a single cell
+    this.width = mapWidth; //Total width of map
+    this.height = mapHeight; //Total height of map
+    this.cells = []; //2D array of cells, containing references to objects within those cells
     this.globalItems = []; //list of Item objects
+    this.backgroundImage = null;
     //Call this before using a map. Creates the needed number of cells based on cell size
     this.initializeCells = function() {
         var c, r;
@@ -289,14 +294,25 @@ function Map(cellSize) {
             }
         }
     };
-    //Adds an object to its appropriate cell location
-    this.addObject = function(obj) {
+    //Adds an object to its appropriate cell location(s)
+    this.add = function(obj) {
+        this.globalItems.push(obj);
+        this.updateDrawOrder();
         var c, r;
         for (c = Math.floor(obj.x / this.cellSize); c < (obj.x + obj.w) / this.cellSize; c++) {
             for (r = Math.floor(obj.y / this.cellSize); r < (obj.y + obj.h) / this.cellSize; r++) {
                 this.cells[c][r].push(obj);
-                this.globalItems.push(obj);
-                this.updateDrawOrder();
+            }
+        }
+
+    };
+    //Removes an object from its cell location(s)
+    this.remove = function(obj) {
+        var c, r, index;
+        for (c = Math.floor(obj.x / this.cellSize); c < (obj.x + obj.w) / this.cellSize; c++) {
+            for (r = Math.floor(obj.y / this.cellSize); r < (obj.y + obj.h) / this.cellSize; r++) {
+                index = this.cells[c][r].indexOf(obj);
+                this.cells[c][r].splice(index, 1);
             }
         }
     };
@@ -306,7 +322,6 @@ function Map(cellSize) {
         var actualX = movement[0],
             actualY = movement[1];
         this.updateCells(obj, actualX, actualY);
-        this.updateDrawOrder();
         return [actualX, actualY];
     };
     //Prevents the object from being out of bounds
@@ -386,37 +401,47 @@ function Map(cellSize) {
         var c, r, index;
         if(obj.x !== actualX || obj.y !== actualY) {
             //Remove object from cell(s). Can be turned into removeObject(obj) with some refactoring.
-            for (c = Math.floor(obj.x / this.cellSize); c < (obj.x + obj.w) / this.cellSize; c++) {
+            /*for (c = Math.floor(obj.x / this.cellSize); c < (obj.x + obj.w) / this.cellSize; c++) {
                 for (r = Math.floor(obj.y / this.cellSize); r < (obj.y + obj.h) / this.cellSize; r++) {
                     index = this.cells[c][r].indexOf(obj);
                     this.cells[c][r].splice(index, 1);
                 }
-            }
-            //Add object to cell(s). Can be replaced with addObject() with some refactoring
+            }*/
+            this.remove(obj);
+            //Add object to cell(s). Can be replaced with add() with some refactoring
             for (c = Math.floor(actualX / this.cellSize); c < (actualX + obj.w) / this.cellSize; c++) {
                 for (r = Math.floor(actualY / this.cellSize); r < (actualY + obj.h) / this.cellSize; r++) {
                     index = this.cells[c][r].indexOf(lyle);
                     this.cells[c][r].push(obj);
                 }
             }
+            this.updateDrawOrder();
         }
+
     };
     //Calls .update() on all contained items
-    this.update = function () {
+    this.update = function() {
+        if(this.backgroundImage !== null) {
+            var gc = gameWindow.context;
+            gc.drawImage(this.backgroundImage, 0, 0);
+        }
         for(var i = 0; i < this.globalItems.length; i++) {
             this.globalItems[i].update();
         }
     };
     //Updates draw order based on y position of all objects
-    this.updateDrawOrder = function () {
+    this.updateDrawOrder = function() {
         this.globalItems.sort(this.compareY);
     };
     //Sort function for comparing items based on y value
-    this.compareY = function (a, b) {
-        if (a.y < b.y) {
+    this.compareY = function(a, b) {
+        var ay, by;
+        ay = a.y + a.h;
+        by = b.y + b.h;
+        if (ay < by) {
             return -1;
         }
-        else if (a.y > b.y) {
+        else if (ay > by) {
             return 1;
         }
         else {
@@ -455,21 +480,39 @@ function Map(cellSize) {
             }
         }
         gc.globalAlpha = 1;
+    };
+    //Change current map to a new map
+    this.transitionMaps = function(newMap, player, newX, newY) {
+        maps[curMap].remove(player);
+        curMap = newMap;
+        player.x = newX;
+        player.y = newY;
+        maps[curMap].add(player);
+    };
+    //Fades a map to black, runs a script, then restores sight
+    this.fadeMap = function (script, player, timer) {
+        var gc = gameWindow.context;
+        gc.fillStyle = "#000000";
+        gc.fillRect(0, 0, mapWidth, mapHeight);
+    }
+    //Sets a background image
+    this.setBackgroundImage = function (img) {
+        this.backgroundImage = img;
     }
 }
 
 function Animation(img, startIndex, endIndex, row, width, height) {
-    this.img = img;
-    this.startIndex = startIndex;
-    this.endIndex = endIndex;
-    this.curIndex = startIndex;
-    this.row = row;
-    this.width = width;
-    this.height = height;
-    this.frameCounter = 0;
-    this.frameTimer = 200;
-    this.animated = true;
-    this.isOriginalOrientation = true;
+    this.img = img; //Image object to load sprites from
+    this.startIndex = startIndex; //Starting frame index
+    this.endIndex = endIndex; //Ending frame index
+    this.curIndex = startIndex; //Current frame index to draw
+    this.row = row; //The row in the image where the entire spritesheet is
+    this.width = width; //Width of a single sprite
+    this.height = height; //Height of a single sprite
+    this.frameCounter = 0; //Counts up to frameTimer value to draw next frame
+    this.frameTimer = 200; //Timer value for when to draw next frame
+    this.animated = true; //Is the animation to be animated?
+    this.isOriginalOrientation = true; //Is the animation in its original orientation? Abstract, not 'left' or 'right'
 
     this.update = function (dt, x, y) {
         var gc = gameWindow.context;
@@ -510,7 +553,7 @@ function Animation(img, startIndex, endIndex, row, width, height) {
     };
 }
 
-function Trigger(parent, id) {
+function DialogueTrigger(parent, id) {
     this.flag = false;
     this.parent = parent; //The dialogues to reference
     this.id = id; //The dialogue id to skip to
@@ -521,6 +564,13 @@ function Trigger(parent, id) {
             this.parent.pointer = this.id;
         }
     }
+}
+
+function TransitionTrigger(destMapID, destX, destY) {
+    this.run = function () {
+        maps[curMap].transitionMaps(destMapID, lyle, destX, destY)
+    }
+
 }
 
 function update() { //Handles both update and draw functions- this is probably a no no
@@ -544,7 +594,7 @@ function update() { //Handles both update and draw functions- this is probably a
             dy = Math.ceil(lyle.xSpeed * dt);
         }
         if(dx !== 0 || dy !== 0) {
-            var movement = apartment.move(lyle, lyle.x + dx, lyle.y + dy);
+            var movement = maps[curMap].move(lyle, lyle.x + dx, lyle.y + dy);
             lyle.x = movement[0];
             lyle.y = movement[1];
         }
@@ -567,10 +617,14 @@ function startGame() {
     );
     loadAnimations();
     apartment.initializeCells();
-    apartment.addObject(lyle);
-    apartment.addObject(block1);
-    apartment.addObject(block2);
-    apartment.addObject(block3);
+    apartment.add(lyle);
+    apartment.add(block1);
+    apartment.add(block2);
+    apartment.add(block3);
+    apartment.add(block4);
+    kitchen.initializeCells();
+    kitchen.add(block5);
+    kitchen.add(block6);
     gameWindow.start();
     }
 
@@ -587,6 +641,6 @@ function loadAnimations() {
     animations[2] = new Animation(images[3], 0, 0, 0, 384, 416); // 02 : Test
 }
 
-function transitionMaps(newMap, newX, newY) {
-
+function exists(obj) {
+    return (obj !== null && obj !== undefined)
 }
