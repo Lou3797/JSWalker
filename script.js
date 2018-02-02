@@ -30,7 +30,7 @@ var testTrans0 = new TransitionTrigger(0, 50, 50);
 
 var kitchen = new Map(100);
 var apartment = new Map(100);
-var block1 = new Item(200, 180, 366, 359, undefined, false);
+var block1 = new Item(200, 180, 366, 359, undefined, true);
 var block2 = new Item(399, 60, 120, 400, "#EE22AA", false, true, null, testTrigger);
 var block3 = new Item(80, 350, 32, 32, "#996666", false, true, testDialogues);
 var block4 = new Item(100, 10, 40, 40, "#5d5d5d", false, true, null, testTrans1);
@@ -42,8 +42,8 @@ var curMap = 0;
 
 var lyle = {
     canMove : true,
-    x : 53,
-    y : 53,
+    x : 0,
+    y : 0,
     w : 48,
     h : 48,
     xSpeed : 0.15,
@@ -494,7 +494,7 @@ function Map(cellSize) {
         var gc = gameWindow.context;
         gc.fillStyle = "#000000";
         gc.fillRect(0, 0, mapWidth, mapHeight);
-    }
+    };
     //Sets a background image
     this.setBackgroundImage = function (img) {
         this.backgroundImage = img;
@@ -517,10 +517,10 @@ function Animation(img, startIndex, endIndex, row, width, height) {
     this.update = function (dt, x, y) {
         var gc = gameWindow.context;
         if(this.isOriginalOrientation) {
-            gc.drawImage(this.img, this.curIndex * this.width, this.row, this.width, this.height, x, y, this.width, this.height);
+            gc.drawImage(this.img, this.curIndex * this.width, this.row * this.height, this.width, this.height, x, y, this.width, this.height);
         } else {
             gc.scale(-1,1);
-            gc.drawImage(this.img, this.curIndex * this.width, this.row, this.width, this.height, x - mapWidth, y, this.width, this.height);
+            gc.drawImage(this.img, this.curIndex * this.width, this.row * this.height, this.width, this.height, x - mapWidth, y, this.width, this.height);
             gc.setTransform(1,0,0,1,0,0);
         }
         if(this.animated) {
@@ -597,6 +597,7 @@ function update() { //Handles both update and draw functions- this is probably a
             var movement = maps[curMap].move(lyle, lyle.x + dx, lyle.y + dy);
             lyle.x = movement[0];
             lyle.y = movement[1];
+            maps[curMap].updateDrawOrder();
         }
     }
 
@@ -613,7 +614,9 @@ function startGame() {
         "https://i.imgur.com/ezVjs9g.png", // 00 : Textbox
         "https://i.imgur.com/seoBUYH.png", // 01 : Lyle portrait placeholders
         "https://i.imgur.com/oQeiIiH.png", // 02 : Kiana portrait placeholders
-        "https://i.imgur.com/sOPIFBE.png"  // 03 : Test height
+        "https://i.imgur.com/sOPIFBE.png", // 03 : Test height
+        "https://i.imgur.com/YQQkspf.png", // 04 : Apartment placeholder
+        "https://i.imgur.com/6MHfERD.png"  // 05: Kitchen placeholder
     );
     loadAnimations();
     apartment.initializeCells();
@@ -625,6 +628,8 @@ function startGame() {
     kitchen.initializeCells();
     kitchen.add(block5);
     kitchen.add(block6);
+    apartment.setBackgroundImage(images[4]);
+    kitchen.setBackgroundImage(images[5]);
     gameWindow.start();
     }
 
@@ -643,4 +648,11 @@ function loadAnimations() {
 
 function exists(obj) {
     return (obj !== null && obj !== undefined)
+}
+
+function help() {
+    console.log("Hello hacker fucker.\n" +
+        "Written by ProxyLou\nRelease version 0\nDon't take anything you find here please!\n" +
+        "\n---Player coordinates---\nlyle.x = " + lyle.x + "\nlyle.y = " + lyle.y + "\n" +
+        "\n---Walk speed---\nlyle.xSpeed = " + lyle.xSpeed + "\nlyle.ySpeed = " + lyle.ySpeed + "\n")
 }
